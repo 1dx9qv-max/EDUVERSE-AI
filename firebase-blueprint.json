@@ -1,0 +1,1087 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public and private profile data for users (students, guardians, teachers, admins)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "emailVerified": { "type": "boolean" },
+        "authProvider": { "type": "string", "enum": ["google", "password"] },
+        "username": { "type": "string", "maxLength": 24 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "avatarId": { "type": "string", "maxLength": 48 },
+        "role": { "type": "string", "enum": ["student", "guardian", "teacher", "admin"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "board": { "type": "string", "enum": ["CBSE", "CISCE", "ICSE", "ISC", "StateBoard", "Other"] },
+        "classGrade": { "type": "string", "enum": ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"] },
+        "state": { "type": "string", "maxLength": 80 },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual", "Hinglish"] },
+        "subjects": { "type": "array" },
+        "learningGoals": { "type": "array" },
+        "onboardingCompleted": { "type": "boolean" },
+        "streakDays": { "type": "integer" },
+        "xpPoints": { "type": "integer" },
+        "photoURL": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "displayName", "role", "board", "classGrade", "language"]
+    },
+    "UsernameClaim": {
+      "title": "UsernameClaim",
+      "description": "Atomic unique username registry mapping normalized lowercase handle to owning user UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 24 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "username", "createdAt"]
+    },
+    "GuardianLink": {
+      "title": "GuardianLink",
+      "description": "Verified relationship linking a guardian to a student profile with granular privacy permissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "guardianUid": { "type": "string", "maxLength": 128 },
+        "guardianName": { "type": "string", "maxLength": 100 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentDisplayName": { "type": "string", "maxLength": 100 },
+        "relationship": { "type": "string", "enum": ["parent", "guardian", "mentor"] },
+        "status": { "type": "string", "enum": ["pending", "verified", "revoked"] },
+        "permissions": { "type": "object" },
+        "verifiedAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "guardianUid", "studentUid", "relationship", "status", "permissions"]
+    },
+    "BoardRecord": {
+      "title": "BoardRecord",
+      "description": "Educational board definition (CBSE, CISCE, ICSE, ISC, State Boards)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "code": { "type": "string", "maxLength": 32 },
+        "name": { "type": "string", "maxLength": 100 },
+        "fullName": { "type": "string", "maxLength": 200 },
+        "type": { "type": "string", "enum": ["national", "state", "international"] },
+        "state": { "type": "string", "maxLength": 80 },
+        "officialWebsite": { "type": "string", "maxLength": 500 },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "name", "fullName", "type"]
+    },
+    "ClassRecord": {
+      "title": "ClassRecord",
+      "description": "Class/Grade definition belonging to an education board",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "boardId": { "type": "string", "maxLength": 64 },
+        "grade": { "type": "string", "maxLength": 30 },
+        "stream": { "type": "string", "maxLength": 60 },
+        "academicYear": { "type": "string", "maxLength": 30 },
+        "isVerified": { "type": "boolean" }
+      },
+      "required": ["id", "boardId", "grade"]
+    },
+    "SubjectRecord": {
+      "title": "SubjectRecord",
+      "description": "Academic subject belonging to a board and grade",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "boardId": { "type": "string", "maxLength": 64 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "name": { "type": "string", "maxLength": 100 },
+        "code": { "type": "string", "maxLength": 30 },
+        "icon": { "type": "string", "maxLength": 50 },
+        "color": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 50 },
+        "isVerified": { "type": "boolean" }
+      },
+      "required": ["id", "boardId", "classGrade", "name"]
+    },
+    "SyllabusNode": {
+      "title": "SyllabusNode",
+      "description": "Chapter, topic, and learning objective curriculum node with verified syllabus state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "boardId": { "type": "string", "maxLength": 64 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "chapterNumber": { "type": "integer" },
+        "chapterTitle": { "type": "string", "maxLength": 200 },
+        "topics": { "type": "array" },
+        "version": { "type": "string", "maxLength": 30 },
+        "isVerified": { "type": "boolean" },
+        "verifiedBy": { "type": "string", "maxLength": 128 },
+        "sourceDoc": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "boardId", "classGrade", "subjectId", "chapterNumber", "chapterTitle", "isVerified"]
+    },
+    "LearningProfile": {
+      "title": "LearningProfile",
+      "description": "Student learning pace, strengths, weaknesses, and personalized daily goals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "preferredPace": { "type": "string", "enum": ["steady", "accelerated", "revision-focus"] },
+        "strengths": { "type": "array" },
+        "weaknesses": { "type": "array" },
+        "dailyGoalMinutes": { "type": "integer" },
+        "dailyQuestionsTarget": { "type": "integer" },
+        "lastActiveDate": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "preferredPace", "dailyGoalMinutes", "dailyQuestionsTarget"]
+    },
+    "StudyPlan": {
+      "title": "StudyPlan",
+      "description": "Personalized study schedule and task list for a student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "targetDate": { "type": "string" },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "tasks": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "completed", "archived"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "status"]
+    },
+    "ActivityRecord": {
+      "title": "ActivityRecord",
+      "description": "Verified UID-scoped student learning activity event with idempotency key and local date key",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": {
+          "type": "string",
+          "enum": [
+            "doubt_asked",
+            "practice_completed",
+            "topic_studied",
+            "goal_achieved",
+            "revision_due",
+            "lesson_started",
+            "lesson_completed",
+            "topic_completed",
+            "doubt_submitted",
+            "practice_attempted",
+            "flashcard_reviewed",
+            "revision_completed",
+            "exam_attempted",
+            "study_goal_completed",
+            "mindmap_created",
+            "voice_turn"
+          ]
+        },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "subjectId": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "objectiveId": { "type": "string", "maxLength": 80 },
+        "sourceModule": { "type": "string", "maxLength": 40 },
+        "idempotencyKey": { "type": "string", "maxLength": 160 },
+        "localDateKey": { "type": "string", "maxLength": 16 },
+        "xpEarned": { "type": "integer" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "title", "timestamp"]
+    },
+    "DoubtTicket": {
+      "title": "DoubtTicket",
+      "description": "Student question submitted to AI doubt solver or teacher (never stores raw uploaded binary documents)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 150 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "board": { "type": "string", "maxLength": 32 },
+        "inputMode": { "type": "string", "enum": ["typed", "image", "handwritten", "pdf", "worksheet"] },
+        "attachmentLabel": { "type": "string", "maxLength": 160 },
+        "questionText": { "type": "string", "maxLength": 3000 },
+        "language": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["open", "answered", "closed"] },
+        "aiAnswer": { "type": "string", "maxLength": 10000 },
+        "structuredSolution": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "subject", "questionText", "status"]
+    },
+    "TeacherSession": {
+      "title": "TeacherSession",
+      "description": "Personal AI Teacher multi-turn tutoring conversation session bound to student profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "board": { "type": "string", "maxLength": 32 },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual"] },
+        "difficultyLevel": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced"] },
+        "teachingMode": { "type": "string", "enum": ["explain", "step-by-step", "examples", "explain-mistake", "test-understanding", "summarize-chapter"] },
+        "messages": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "subject", "classGrade", "board", "language", "difficultyLevel", "teachingMode", "messages"]
+    },
+    "PracticeRecord": {
+      "title": "PracticeRecord",
+      "description": "Quiz and mock exam practice attempt records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 120 },
+        "score": { "type": "integer" },
+        "totalQuestions": { "type": "integer" },
+        "accuracyRate": { "type": "number" },
+        "timeSpentSeconds": { "type": "integer" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "subject", "topic", "score", "totalQuestions", "accuracyRate"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Lookup document that designates an authenticated user as an Eduverse platform administrator",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "grantedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "MindMap": {
+      "title": "MindMap",
+      "description": "Hierarchical concept mind map created or generated by a student for a specific board, class, and subject",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "board": { "type": "string", "maxLength": 32 },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual"] },
+        "syllabusStatus": { "type": "string", "enum": ["verified", "sample", "custom"] },
+        "summary": { "type": "string", "maxLength": 1000 },
+        "syllabusNote": { "type": "string", "maxLength": 600 },
+        "nodes": { "type": "array" },
+        "crossLinks": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "topic", "subject", "classGrade", "board", "language", "nodes"]
+    },
+    "PracticeAttempt": {
+      "title": "PracticeAttempt",
+      "description": "Individual adaptive practice question attempt with difficulty, correctness, time spent, and error classification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "questionId": { "type": "string", "maxLength": 128 },
+        "questionType": { "type": "string", "enum": ["mcq", "true-false", "fill-blank", "short-answer", "numerical"] },
+        "difficulty": { "type": "string", "enum": ["foundation", "intermediate", "board-challenge"] },
+        "prompt": { "type": "string", "maxLength": 1200 },
+        "userAnswer": { "type": "string", "maxLength": 1000 },
+        "correctAnswer": { "type": "string", "maxLength": 1000 },
+        "isCorrect": { "type": "boolean" },
+        "scoreRatio": { "type": "number" },
+        "timeSpentSeconds": { "type": "integer" },
+        "errorTag": { "type": "string", "maxLength": 80 },
+        "misconceptionNote": { "type": "string", "maxLength": 600 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "subject", "topic", "questionType", "difficulty", "isCorrect", "timeSpentSeconds", "createdAt"]
+    },
+    "TopicMastery": {
+      "title": "TopicMastery",
+      "description": "Transparent aggregated topic mastery state, recurring error log, revision count, and historical snapshots",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "attemptsCount": { "type": "integer" },
+        "correctCount": { "type": "integer" },
+        "recentAccuracy": { "type": "number" },
+        "weightedMasteryScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["mastered", "developing", "needs-revision", "insufficient-data"] },
+        "currentRecommendedDifficulty": { "type": "string", "enum": ["foundation", "intermediate", "board-challenge"] },
+        "totalTimeSpentSeconds": { "type": "integer" },
+        "recurringErrors": { "type": "array" },
+        "revisionCount": { "type": "integer" },
+        "lastPracticedAt": { "type": "string" },
+        "lastRevisedAt": { "type": "string" },
+        "historySnapshots": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "subject", "topic", "attemptsCount", "correctCount", "weightedMasteryScore", "status", "currentRecommendedDifficulty"]
+    },
+    "Flashcard": {
+      "title": "Flashcard",
+      "description": "Active-recall flashcard with SM-2 spaced repetition schedule and difficulty tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "front": { "type": "string", "maxLength": 800 },
+        "back": { "type": "string", "maxLength": 1400 },
+        "hint": { "type": "string", "maxLength": 400 },
+        "source": { "type": "string", "enum": ["ai-generated", "student-custom", "error-remediation"] },
+        "linkedErrorTag": { "type": "string", "maxLength": 80 },
+        "difficultyTag": { "type": "string", "enum": ["normal", "difficult"] },
+        "repetitions": { "type": "integer" },
+        "intervalDays": { "type": "integer" },
+        "easeFactor": { "type": "number" },
+        "lapses": { "type": "integer" },
+        "dueDate": { "type": "string" },
+        "lastReviewedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "subject", "chapter", "topic", "front", "back", "source", "difficultyTag", "repetitions", "intervalDays", "easeFactor", "lapses", "dueDate"]
+    },
+    "FlashcardReview": {
+      "title": "FlashcardReview",
+      "description": "Immutable review log recording active recall rating and scheduled interval transition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "cardId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "quality": { "type": "integer" },
+        "wasCorrect": { "type": "boolean" },
+        "previousIntervalDays": { "type": "integer" },
+        "nextIntervalDays": { "type": "integer" },
+        "reviewedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "cardId", "subject", "topic", "quality", "wasCorrect", "previousIntervalDays", "nextIntervalDays", "reviewedAt"]
+    },
+    "ExamAttempt": {
+      "title": "ExamAttempt",
+      "description": "Server-validated AI practice exam attempt with graded question results, topic/difficulty breakdowns, and mistake analysis (never an official board exam)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "submissionId": { "type": "string", "maxLength": 128 },
+        "sessionId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "examId": { "type": "string", "maxLength": 128 },
+        "paperTitle": { "type": "string", "maxLength": 200 },
+        "board": { "type": "string", "enum": ["CBSE", "CISCE", "ICSE", "ISC", "StateBoard", "Other"] },
+        "classGrade": { "type": "string", "enum": ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"] },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "examMode": { "type": "string", "enum": ["chapter-test", "full-syllabus", "custom-test"] },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual"] },
+        "isOfficialBoardExam": { "type": "boolean" },
+        "durationMinutes": { "type": "integer" },
+        "elapsedSeconds": { "type": "integer" },
+        "timingStatus": { "type": "string", "enum": ["on-time", "auto-submitted-timeout", "grace-accepted", "overtime-clamped"] },
+        "totalQuestions": { "type": "integer" },
+        "attemptedCount": { "type": "integer" },
+        "correctCount": { "type": "integer" },
+        "incorrectCount": { "type": "integer" },
+        "totalMarks": { "type": "number" },
+        "marksObtained": { "type": "number" },
+        "percentage": { "type": "integer" },
+        "questionResults": { "type": "array" },
+        "topicBreakdown": { "type": "array" },
+        "difficultyBreakdown": { "type": "array" },
+        "mistakeSummary": { "type": "array" },
+        "recommendedRevisionTopics": { "type": "array" },
+        "submittedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": [
+        "id",
+        "submissionId",
+        "sessionId",
+        "userId",
+        "examId",
+        "paperTitle",
+        "board",
+        "classGrade",
+        "subject",
+        "examMode",
+        "language",
+        "isOfficialBoardExam",
+        "durationMinutes",
+        "elapsedSeconds",
+        "timingStatus",
+        "totalQuestions",
+        "attemptedCount",
+        "correctCount",
+        "incorrectCount",
+        "totalMarks",
+        "marksObtained",
+        "percentage",
+        "questionResults",
+        "topicBreakdown",
+        "difficultyBreakdown",
+        "mistakeSummary",
+        "recommendedRevisionTopics",
+        "submittedAt"
+      ]
+    },
+    "VoiceSession": {
+      "title": "VoiceSession",
+      "description": "Text-only voice classroom conversation transcript and metadata (raw audio recordings are never stored)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 140 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "board": { "type": "string", "maxLength": 32 },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual"] },
+        "voiceName": { "type": "string", "enum": ["Kore", "Zephyr", "Puck", "Charon", "Fenrir"] },
+        "transportUsed": { "type": "string", "enum": ["gemini-live", "stt-tts-pipeline", "text-fallback"] },
+        "turns": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "title", "subject", "topic", "classGrade", "board", "language", "voiceName", "transportUsed", "turns"]
+    },
+    "StudyRoom": {
+      "title": "StudyRoom",
+      "description": "Private invitation-only collaborative study space with public DMs disabled",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 120 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 140 },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "hostUid": { "type": "string", "maxLength": 128 },
+        "hostAlias": { "type": "string", "maxLength": 60 },
+        "inviteCode": { "type": "string", "maxLength": 24 },
+        "isPrivate": { "type": "boolean" },
+        "directMessagesDisabled": { "type": "boolean" },
+        "isLocked": { "type": "boolean" },
+        "maxMembers": { "type": "integer" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "subject", "topic", "board", "classGrade", "hostUid", "hostAlias", "inviteCode", "isPrivate", "directMessagesDisabled", "isLocked", "maxMembers"]
+    },
+    "StudyRoomMembershipIndex": {
+      "title": "StudyRoomMembershipIndex",
+      "description": "Per-user private index of joined study rooms (avoids public room scraping)",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomTitle": { "type": "string", "maxLength": 120 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "role": { "type": "string", "enum": ["host", "moderator", "member"] },
+        "joinedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["roomId", "roomTitle", "subject", "role", "joinedAt"]
+    },
+    "StudyRoomMember": {
+      "title": "StudyRoomMember",
+      "description": "Privacy-safe study room participant projection (excludes email, phone, and private profile details)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "alias": { "type": "string", "maxLength": 60 },
+        "avatarInitial": { "type": "string", "maxLength": 4 },
+        "role": { "type": "string", "enum": ["host", "moderator", "member"] },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["active", "muted", "removed"] },
+        "contributionsCount": { "type": "integer" },
+        "quizPoints": { "type": "integer" },
+        "joinedAt": { "type": "string", "maxLength": 64 },
+        "lastActiveAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "roomId", "alias", "avatarInitial", "role", "board", "classGrade", "status"]
+    },
+    "StudyRoomInvite": {
+      "title": "StudyRoomInvite",
+      "description": "Secret invitation token granting join access to a private study room",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "maxLength": 24 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomTitle": { "type": "string", "maxLength": 120 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "expiresAt": { "type": "string", "maxLength": 64 },
+        "maxUses": { "type": "integer" },
+        "usesCount": { "type": "integer" },
+        "revoked": { "type": "boolean" }
+      },
+      "required": ["code", "roomId", "roomTitle", "subject", "createdByUid", "expiresAt", "maxUses", "usesCount", "revoked"]
+    },
+    "StudyRoomNote": {
+      "title": "StudyRoomNote",
+      "description": "Moderated collaborative note shared inside a private study room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "authorAlias": { "type": "string", "maxLength": 60 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 140 },
+        "title": { "type": "string", "maxLength": 160 },
+        "body": { "type": "string", "maxLength": 2000 },
+        "pinned": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["visible", "flagged", "hidden"] },
+        "reportCount": { "type": "integer" },
+        "reportedBy": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "authorUid", "authorAlias", "title", "body", "pinned", "status", "reportCount"]
+    },
+    "StudyRoomGoal": {
+      "title": "StudyRoomGoal",
+      "description": "Collaborative study milestone shared inside a private room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "targetCount": { "type": "integer" },
+        "currentCount": { "type": "integer" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "contributorUids": { "type": "array" },
+        "completed": { "type": "boolean" },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByAlias": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "title", "targetCount", "currentCount", "unit", "completed", "createdByUid", "createdByAlias"]
+    },
+    "StudyRoomQuiz": {
+      "title": "StudyRoomQuiz",
+      "description": "Peer group quiz hosted inside a private study room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 140 },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByAlias": { "type": "string", "maxLength": 60 },
+        "questions": { "type": "array" },
+        "submissions": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "closed"] },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "title", "subject", "topic", "createdByUid", "createdByAlias", "questions", "submissions", "status"]
+    },
+    "StudyRoomMindMap": {
+      "title": "StudyRoomMindMap",
+      "description": "Concept mind map shared with members of a private study room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "sourceMindMapId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "topic": { "type": "string", "maxLength": 140 },
+        "sharedByUid": { "type": "string", "maxLength": 128 },
+        "sharedByAlias": { "type": "string", "maxLength": 60 },
+        "nodes": { "type": "array" },
+        "endorsements": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "title", "subject", "topic", "sharedByUid", "sharedByAlias", "nodes", "endorsements"]
+    },
+    "StudyRoomReport": {
+      "title": "StudyRoomReport",
+      "description": "Content or member safety report submitted for host/moderator review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["note", "goal", "quiz", "member"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetPreview": { "type": "string", "maxLength": 200 },
+        "reporterUid": { "type": "string", "maxLength": 128 },
+        "reporterAlias": { "type": "string", "maxLength": 60 },
+        "reason": { "type": "string", "enum": ["spam-or-offtopic", "inappropriate-language", "personal-info-shared", "external-link", "harassment"] },
+        "details": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["open", "action-taken", "dismissed"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "resolvedByUid": { "type": "string", "maxLength": 128 },
+        "resolvedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "targetType", "targetId", "reporterUid", "reporterAlias", "reason", "status", "createdAt"]
+    },
+    "AchievementState": {
+      "title": "AchievementState",
+      "description": "Persisted healthy motivation metrics, unlocked badge timestamps, and verified milestones",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "streakDays": { "type": "integer" },
+        "totalVerifiedXp": { "type": "integer" },
+        "todayXpEarned": { "type": "integer" },
+        "todayEstimatedMinutes": { "type": "integer" },
+        "unlockedBadgeMap": { "type": "object" },
+        "lastComputedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId", "streakDays", "totalVerifiedXp", "todayXpEarned", "todayEstimatedMinutes", "unlockedBadgeMap", "lastComputedAt"]
+    },
+    "QuestionBankItem": {
+      "title": "QuestionBankItem",
+      "description": "Admin-curated verified question bank record across CBSE/ICSE/State Class 6-12",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "boardId": { "type": "string", "maxLength": 64 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "chapterTitle": { "type": "string", "maxLength": 200 },
+        "topic": { "type": "string", "maxLength": 150 },
+        "questionType": { "type": "string", "enum": ["mcq", "multiple-select", "true-false", "fill-blank", "short-answer", "long-answer", "numerical"] },
+        "difficulty": { "type": "string", "enum": ["foundation", "intermediate", "board-challenge"] },
+        "prompt": { "type": "string", "maxLength": 1200 },
+        "options": { "type": "array" },
+        "correctAnswer": { "type": "string", "maxLength": 500 },
+        "explanation": { "type": "string", "maxLength": 1000 },
+        "marks": { "type": "integer" },
+        "isVerified": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "boardId", "classGrade", "subjectId", "chapterTitle", "topic", "questionType", "difficulty", "prompt", "correctAnswer", "marks", "isVerified"]
+    },
+    "LearningContentItem": {
+      "title": "LearningContentItem",
+      "description": "Curated formula sheet, concept guide, solved example, or revision note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "boardId": { "type": "string", "maxLength": 64 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "chapterTitle": { "type": "string", "maxLength": 200 },
+        "contentType": { "type": "string", "enum": ["concept-guide", "formula-sheet", "solved-example", "revision-note"] },
+        "title": { "type": "string", "maxLength": 200 },
+        "summary": { "type": "string", "maxLength": 500 },
+        "body": { "type": "string", "maxLength": 5000 },
+        "isVerified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "boardId", "classGrade", "subjectId", "contentType", "title", "body", "isVerified", "status"]
+    },
+    "ModerationReport": {
+      "title": "ModerationReport",
+      "description": "Platform-wide student safety or AI moderation report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "source": { "type": "string", "enum": ["study-room", "ai-safety", "platform"] },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["note", "goal", "quiz", "member", "ai-prompt"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetPreview": { "type": "string", "maxLength": 250 },
+        "reporterUid": { "type": "string", "maxLength": 128 },
+        "reporterAlias": { "type": "string", "maxLength": 60 },
+        "reason": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["open", "action-taken", "dismissed"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "resolvedByUid": { "type": "string", "maxLength": 128 },
+        "resolvedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "source", "targetType", "targetId", "reporterUid", "reason", "status", "createdAt"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable append-only administrative security audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "actorRole": { "type": "string", "enum": ["admin"] },
+        "action": { "type": "string", "maxLength": 100 },
+        "targetType": { "type": "string", "maxLength": 40 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "summary": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "actorUid", "actorEmail", "actorRole", "action", "targetType", "targetId", "summary", "createdAt"]
+    },
+    "GuardianInviteCode": {
+      "title": "GuardianInviteCode",
+      "description": "Single-use expiring verification code generated by a student for guardian linking",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "maxLength": 64 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentDisplayName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "expiresAt": { "type": "string", "maxLength": 64 },
+        "used": { "type": "boolean" }
+      },
+      "required": ["code", "studentUid", "createdAt", "expiresAt", "used"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Privileged platform administrator authorization record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "LessonProgress": {
+      "title": "LessonProgress",
+      "description": "UID-scoped chapter/topic lesson start and completion progress record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "status": { "type": "string", "enum": ["started", "completed"] },
+        "lastSourceModule": { "type": "string", "maxLength": 40 },
+        "startedAt": { "type": "string", "maxLength": 64 },
+        "completedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "subject", "chapter", "topic", "status", "startedAt"]
+    },
+    "RecommendationHistory": {
+      "title": "RecommendationHistory",
+      "description": "UID-scoped recommendation presentation, completion, and skip cooldown state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "recId": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 160 },
+        "category": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["shown", "started", "completed", "skipped"] },
+        "shownCount": { "type": "integer" },
+        "lastShownAt": { "type": "string", "maxLength": 64 },
+        "completedAt": { "type": "string", "maxLength": 64 },
+        "skippedAt": { "type": "string", "maxLength": 64 },
+        "cooldownUntil": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "recId", "status", "lastShownAt"]
+    },
+    "DailyGoalRecord": {
+      "title": "DailyGoalRecord",
+      "description": "UID-scoped timezone-keyed daily learning goal snapshot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "localDateKey": { "type": "string", "maxLength": 16 },
+        "goalKey": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 40 },
+        "targetCount": { "type": "integer" },
+        "currentCount": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string", "maxLength": 64 },
+        "xpReward": { "type": "integer" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "localDateKey", "goalKey", "title", "completed"]
+    },
+    "VisualExploration": {
+      "title": "VisualExploration",
+      "description": "AI-generated and student-saved interactive visual learning exploration scoped to userId",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "cacheKey": { "type": "string", "maxLength": 240 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "board": { "type": "string", "maxLength": 32 },
+        "classGrade": { "type": "string", "maxLength": 30 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapter": { "type": "string", "maxLength": 160 },
+        "topic": { "type": "string", "maxLength": 180 },
+        "customPrompt": { "type": "string", "maxLength": 400 },
+        "language": { "type": "string", "enum": ["English", "Hindi"] },
+        "title": { "type": "string", "maxLength": 200 },
+        "subtitle": { "type": "string", "maxLength": 240 },
+        "visualCategory": {
+          "type": "string",
+          "enum": [
+            "physics-simulation",
+            "math-graph",
+            "geometry-construction",
+            "chemistry-model",
+            "annotated-diagram",
+            "process-cycle",
+            "illustrated-concept"
+          ]
+        },
+        "rendererType": {
+          "type": "string",
+          "enum": [
+            "kinematics-projectile",
+            "optics-ray",
+            "circuit-network",
+            "wave-oscillation",
+            "bohr-atom",
+            "molecular-geometry",
+            "math-function-plot",
+            "coordinate-geometry",
+            "annotated-diagram",
+            "illustrated-concept"
+          ]
+        },
+        "modalityHonestyLabel": { "type": "string", "maxLength": 260 },
+        "conceptExplanation": { "type": "string", "maxLength": 1500 },
+        "whatYouAreObserving": { "type": "string", "maxLength": 800 },
+        "interactionInstructions": { "type": "string", "maxLength": 500 },
+        "formulaOrLaw": { "type": "string", "maxLength": 200 },
+        "keyTakeaways": { "type": "array" },
+        "observationsChecklist": { "type": "array" },
+        "steps": { "type": "array" },
+        "engineConfig": { "type": "object" },
+        "saved": { "type": "boolean" },
+        "cached": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": [
+        "id",
+        "cacheKey",
+        "userId",
+        "board",
+        "classGrade",
+        "subject",
+        "chapter",
+        "topic",
+        "language",
+        "title",
+        "visualCategory",
+        "rendererType",
+        "steps",
+        "engineConfig",
+        "saved",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document indexed by the user UID"
+    },
+    "/usernames/{username}": {
+      "schema": "UsernameClaim",
+      "description": "Unique lowercase handle registry indexed by normalized username"
+    },
+    "/users/{userId}/study_memberships/{roomId}": {
+      "schema": "StudyRoomMembershipIndex",
+      "description": "Private index of study rooms joined by the user"
+    },
+    "/guardians/{guardianLinkId}": {
+      "schema": "GuardianLink",
+      "description": "Verified relationship linking a guardian to a student"
+    },
+    "/boards/{boardId}": {
+      "schema": "BoardRecord",
+      "description": "Official educational boards (CBSE, CISCE, State Boards)"
+    },
+    "/classes/{classId}": {
+      "schema": "ClassRecord",
+      "description": "Classes and grade streams"
+    },
+    "/subjects/{subjectId}": {
+      "schema": "SubjectRecord",
+      "description": "Academic subjects mapped to boards and grades"
+    },
+    "/syllabus/{syllabusId}": {
+      "schema": "SyllabusNode",
+      "description": "Verified curriculum chapter and topic nodes"
+    },
+    "/learning_profiles/{profileId}": {
+      "schema": "LearningProfile",
+      "description": "Student learning pace and goal preferences"
+    },
+    "/study_plans/{planId}": {
+      "schema": "StudyPlan",
+      "description": "Personalized student study plans"
+    },
+    "/activities/{activityId}": {
+      "schema": "ActivityRecord",
+      "description": "Student learning activity events"
+    },
+    "/doubts/{doubtId}": {
+      "schema": "DoubtTicket",
+      "description": "Doubt questions and structured AI solutions submitted by students"
+    },
+    "/teacher_sessions/{sessionId}": {
+      "schema": "TeacherSession",
+      "description": "Saved Personal AI Teacher multi-turn conversation sessions"
+    },
+    "/mindmaps/{mindMapId}": {
+      "schema": "MindMap",
+      "description": "Saved hierarchical concept mind maps and cross-concept links"
+    },
+    "/practiceRecords/{recordId}": {
+      "schema": "PracticeRecord",
+      "description": "Student practice quiz results"
+    },
+    "/practice_attempts/{attemptId}": {
+      "schema": "PracticeAttempt",
+      "description": "Per-question adaptive practice attempt telemetry and error tags"
+    },
+    "/topic_mastery/{masteryId}": {
+      "schema": "TopicMastery",
+      "description": "Student topic-level mastery state, recurring errors, and progress snapshots"
+    },
+    "/flashcards/{cardId}": {
+      "schema": "Flashcard",
+      "description": "Spaced repetition active recall flashcards (AI, custom, and error-remediation)"
+    },
+    "/flashcard_reviews/{reviewId}": {
+      "schema": "FlashcardReview",
+      "description": "Flashcard revision history logs"
+    },
+    "/exam_attempts/{attemptId}": {
+      "schema": "ExamAttempt",
+      "description": "Server-validated AI practice exam attempt records with detailed topic, difficulty, and mistake breakdowns"
+    },
+    "/voice_sessions/{sessionId}": {
+      "schema": "VoiceSession",
+      "description": "Saved text-only voice classroom transcripts and metadata (never stores raw audio recordings)"
+    },
+    "/study_rooms/{roomId}": {
+      "schema": "StudyRoom",
+      "description": "Private invitation-only collaborative study space metadata"
+    },
+    "/study_rooms/{roomId}/members/{memberUid}": {
+      "schema": "StudyRoomMember",
+      "description": "Safe room participant profile without private PII"
+    },
+    "/study_rooms/{roomId}/notes/{noteId}": {
+      "schema": "StudyRoomNote",
+      "description": "Moderated collaborative notes inside a study room"
+    },
+    "/study_rooms/{roomId}/goals/{goalId}": {
+      "schema": "StudyRoomGoal",
+      "description": "Collaborative study milestones inside a study room"
+    },
+    "/study_rooms/{roomId}/quizzes/{quizId}": {
+      "schema": "StudyRoomQuiz",
+      "description": "Group quizzes inside a study room"
+    },
+    "/study_rooms/{roomId}/mindmaps/{mapId}": {
+      "schema": "StudyRoomMindMap",
+      "description": "Shared concept mind maps inside a study room"
+    },
+    "/study_rooms/{roomId}/reports/{reportId}": {
+      "schema": "StudyRoomReport",
+      "description": "Safety and content moderation reports inside a study room"
+    },
+    "/study_room_invites/{inviteCode}": {
+      "schema": "StudyRoomInvite",
+      "description": "Secret invitation token resolving to a private study room"
+    },
+    "/achievement_states/{userId}": {
+      "schema": "AchievementState",
+      "description": "Verified healthy achievement progress and badge unlock records"
+    },
+    "/question_bank/{questionId}": {
+      "schema": "QuestionBankItem",
+      "description": "Admin-managed verified question bank records"
+    },
+    "/learning_content/{contentId}": {
+      "schema": "LearningContentItem",
+      "description": "Admin-managed concept guides, formula sheets, and revision notes"
+    },
+    "/moderation_reports/{reportId}": {
+      "schema": "ModerationReport",
+      "description": "Platform-wide student safety and moderation queue"
+    },
+    "/admin_audit_logs/{logId}": {
+      "schema": "AdminAuditLog",
+      "description": "Immutable append-only administrative security audit trail"
+    },
+    "/guardian_invite_codes/{code}": {
+      "schema": "GuardianInviteCode",
+      "description": "Student-generated single-use guardian verification tokens"
+    },
+    "/admins/{adminUid}": {
+      "schema": "AdminRecord",
+      "description": "Admin authorization registry document"
+    },
+    "/lesson_progress/{progressId}": {
+      "schema": "LessonProgress",
+      "description": "UID-scoped chapter and topic lesson completion state"
+    },
+    "/recommendation_history/{historyId}": {
+      "schema": "RecommendationHistory",
+      "description": "UID-scoped adaptive recommendation history and skip cooldowns"
+    },
+    "/daily_goals/{goalId}": {
+      "schema": "DailyGoalRecord",
+      "description": "UID-scoped timezone-keyed daily learning goal records"
+    },
+    "/visual_explorations/{visualId}": {
+      "schema": "VisualExploration",
+      "description": "UID-scoped AI-generated interactive visual learning models and saved study library"
+    }
+  }
+}
+

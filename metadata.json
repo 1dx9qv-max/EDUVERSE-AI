@@ -1,0 +1,6 @@
+{
+  "name": "Eduverse AI",
+  "description": "Intelligent learning ecosystem for Indian school students from Class 6 to Class 12 across CBSE, ICSE, and State Boards.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
