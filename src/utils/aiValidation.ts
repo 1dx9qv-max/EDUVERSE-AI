@@ -464,21 +464,36 @@ export function sanitizeDoubtForStorage(ticket: DoubtTicket): DoubtTicket {
 }
 
 export function sanitizeTeacherSessionForStorage(session: TeacherSession): TeacherSession {
+  const safeSubject = (session.subject || '').trim().slice(0, 100) || 'Science';
+  const safeClassGrade = (session.classGrade || '').trim().slice(0, 30) || 'Class 10';
+  const safeBoard = (session.board || '').trim().slice(0, 32) || 'CBSE';
+  const safeTitle = (session.title || '').trim().slice(0, 200) || `${safeSubject} Lesson`;
+
   const boundedMessages: TeacherMessage[] = (session.messages || [])
     .slice(-MAX_SESSION_MESSAGES)
-    .map((m) => ({
-      ...m,
-      id: sanitizeFirestoreId(m.id),
-      content: (m.content || '').slice(0, 6000),
-    }));
+    .map((m) => {
+      const cleanMsg: TeacherMessage = {
+        id: sanitizeFirestoreId(m.id),
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: (m.content || '').slice(0, 6000),
+        mode: isValidTeachingMode(m.mode) ? m.mode : 'explain',
+        level: isValidExplanationLevel(m.level) ? m.level : 'Intermediate',
+        language: normalizeLanguageForTutor(m.language),
+        timestamp: m.timestamp || new Date().toISOString(),
+      };
+      if (m.structured !== undefined) {
+        cleanMsg.structured = m.structured;
+      }
+      return cleanMsg;
+    });
 
   return {
     id: sanitizeFirestoreId(session.id),
-    userId: sanitizeFirestoreId(session.userId),
-    title: (session.title || `${session.subject} Lesson`).trim().slice(0, 200),
-    subject: (session.subject || 'Science').trim().slice(0, 100),
-    classGrade: (session.classGrade || 'Class 10').trim().slice(0, 30),
-    board: (session.board || 'CBSE').trim().slice(0, 32),
+    userId: (session.userId || '').trim().slice(0, 128),
+    title: safeTitle,
+    subject: safeSubject,
+    classGrade: safeClassGrade,
+    board: safeBoard,
     language: normalizeLanguageForTutor(session.language),
     difficultyLevel: isValidExplanationLevel(session.difficultyLevel)
       ? session.difficultyLevel

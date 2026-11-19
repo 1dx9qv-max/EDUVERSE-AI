@@ -237,7 +237,7 @@
         "subject": { "type": "string", "maxLength": 100 },
         "classGrade": { "type": "string", "maxLength": 30 },
         "board": { "type": "string", "maxLength": 32 },
-        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual"] },
+        "language": { "type": "string", "enum": ["English", "Hindi", "Bilingual", "Hinglish"] },
         "difficultyLevel": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced"] },
         "teachingMode": { "type": "string", "enum": ["explain", "step-by-step", "examples", "explain-mistake", "test-understanding", "summarize-chapter"] },
         "messages": { "type": "array" },

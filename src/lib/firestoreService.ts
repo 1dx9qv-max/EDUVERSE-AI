@@ -579,21 +579,25 @@ export async function saveTeacherSession(session: TeacherSession): Promise<Teach
     throw new Error('Authentication required to save AI Teacher sessions.');
   }
   const uid = auth.currentUser.uid;
-  const sanitized = sanitizeTeacherSessionForStorage({
-    ...session,
-    userId: uid,
-    updatedAt: new Date().toISOString(),
-  });
-  const cacheKey = `${TEACHER_SESSIONS_STORAGE_PREFIX}${uid}`;
-  const current = readCacheList<TeacherSession>(cacheKey);
-  const next = [sanitized, ...current.filter((s) => s.id !== sanitized.id)].slice(0, 25);
-  writeCacheList(cacheKey, next);
+  const sanitized = stripUndefinedDeep(
+    sanitizeTeacherSessionForStorage({
+      ...session,
+      userId: uid,
+      updatedAt: new Date().toISOString(),
+    })
+  );
+  sanitized.userId = uid;
 
   try {
     await setDoc(doc(db, 'teacher_sessions', sanitized.id), sanitized, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `teacher_sessions/${sanitized.id}`);
   }
+
+  const cacheKey = `${TEACHER_SESSIONS_STORAGE_PREFIX}${uid}`;
+  const current = readCacheList<TeacherSession>(cacheKey);
+  const next = [sanitized, ...current.filter((s) => s.id !== sanitized.id)].slice(0, 25);
+  writeCacheList(cacheKey, next);
   emitStatsDirty();
   return sanitized;
 }

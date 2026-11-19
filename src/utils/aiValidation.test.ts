@@ -295,4 +295,59 @@ describe('AI Teacher & Doubt Solver Validation Utilities', () => {
     assert.equal(sanitized.messages.length, MAX_SESSION_MESSAGES);
     assert.equal(sanitized.messages[0].id, 'm-15');
   });
+
+  it('preserves Hinglish and exact UID with all required Firestore rule fields and no undefined keys', () => {
+    const allowedLanguages = new Set(['English', 'Hindi', 'Bilingual', 'Hinglish']);
+    const allowedKeys = new Set([
+      'id',
+      'userId',
+      'title',
+      'subject',
+      'classGrade',
+      'board',
+      'language',
+      'difficultyLevel',
+      'teachingMode',
+      'messages',
+      'createdAt',
+      'updatedAt',
+    ]);
+
+    const session: TeacherSession = {
+      id: 'ts_1795099891543',
+      userId: 'googleUid.WithSpecial:Char123',
+      title: '   ',
+      subject: 'Physics',
+      classGrade: 'Class 10',
+      board: 'CBSE',
+      language: 'Hinglish',
+      difficultyLevel: 'Intermediate',
+      teachingMode: 'explain',
+      messages: [
+        {
+          id: 'msg_u_1',
+          role: 'user',
+          content: 'Electricity samjhao',
+          mode: 'explain',
+          level: 'Intermediate',
+          language: 'Hinglish',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          structured: undefined,
+        },
+      ],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    const sanitized = sanitizeTeacherSessionForStorage(session);
+    assert.equal(sanitized.id, 'ts_1795099891543');
+    assert.equal(sanitized.userId, 'googleUid.WithSpecial:Char123');
+    assert.equal(sanitized.title, 'Physics Lesson');
+    assert.equal(sanitized.language, 'Hinglish');
+    assert.equal(allowedLanguages.has(sanitized.language), true);
+    assert.equal('structured' in sanitized.messages[0], false);
+    for (const key of Object.keys(sanitized)) {
+      assert.equal(allowedKeys.has(key), true);
+    }
+  });
 });
