@@ -213,6 +213,7 @@ export const OnboardingWizard: React.FC = () => {
         language,
         subjects: selectedSubjects,
         learningGoals: selectedGoals,
+        dailyGoalMinutes: dailyMinutes,
       });
     } catch (err: any) {
       setError(err?.message || 'Error saving onboarding profile');

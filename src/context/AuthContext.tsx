@@ -63,7 +63,9 @@ interface AuthContextType {
     error?: string;
   }>;
   updateProfileSettings: (updates: Partial<UserProfile>) => Promise<void>;
-  completeOnboarding: (onboardingData: Partial<UserProfile> & { username: string }) => Promise<void>;
+  completeOnboarding: (
+    onboardingData: Partial<UserProfile> & { username: string; dailyGoalMinutes?: number }
+  ) => Promise<void>;
   deleteAccount: () => Promise<{ firebaseAuthDeleted: boolean }>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -401,7 +403,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeOnboarding = async (
-    onboardingData: Partial<UserProfile> & { username: string }
+    onboardingData: Partial<UserProfile> & { username: string; dailyGoalMinutes?: number }
   ) => {
     if (!firebaseUser || !user) {
       throw new Error('Authentication is required to complete onboarding.');
@@ -446,6 +448,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onboardingCompleted: true,
     });
 
+    const targetDailyMinutes =
+      typeof onboardingData.dailyGoalMinutes === 'number' &&
+      onboardingData.dailyGoalMinutes >= 15 &&
+      onboardingData.dailyGoalMinutes <= 180
+        ? onboardingData.dailyGoalMinutes
+        : 45;
+
     try {
       const learningProfileRef = doc(db, 'learning_profiles', firebaseUser.uid);
       const lpData: LearningProfile = {
@@ -454,7 +463,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         preferredPace: 'steady',
         strengths: [],
         weaknesses: [],
-        dailyGoalMinutes: 45,
+        dailyGoalMinutes: targetDailyMinutes,
         dailyQuestionsTarget: 10,
         lastActiveDate: now,
         updatedAt: now,

@@ -70,7 +70,7 @@ export function createAuthRouter(): Router {
     res.json({ profile });
   });
 
-  router.patch('/profile', requireAuth, (req: Request, res: Response) => {
+  const handleProfileUpdate = (req: Request, res: Response) => {
     const auth = getVerifiedAuth(req)!;
     const body = req.body || {};
     try {
@@ -100,7 +100,11 @@ export function createAuthRouter(): Router {
         code: 'PROFILE_UPDATE_FAILED',
       });
     }
-  });
+  };
+
+  router.patch('/profile', requireAuth, handleProfileUpdate);
+  router.post('/profile', requireAuth, handleProfileUpdate);
+  router.put('/profile', requireAuth, handleProfileUpdate);
 
   router.delete('/account', requireAuth, async (req: Request, res: Response) => {
     const auth = getVerifiedAuth(req)!;

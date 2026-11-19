@@ -89,9 +89,21 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export function resolveApiUrl(path: string): string {
+  const rawBase =
+    typeof import.meta !== 'undefined' && import.meta.env
+      ? (import.meta.env.VITE_API_BASE_URL as string | undefined)
+      : undefined;
+  const base = (rawBase || '').trim().replace(/\/+$/, '');
+  if (!base || /^https?:\/\//i.test(path)) {
+    return path;
+  }
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const authHeaders = await getAuthHeaders();
-  return fetch(url, {
+  return fetch(resolveApiUrl(url), {
     ...init,
     headers: {
       ...(init.headers || {}),
@@ -132,11 +144,22 @@ async function parseErrorResponse(res: Response): Promise<AiApiClientError> {
   } catch {
     // Non-JSON response body
   }
+  let endpointPath = '';
+  try {
+    endpointPath = res.url ? new URL(res.url).pathname : '';
+  } catch {
+    endpointPath = res.url || '';
+  }
+  const isAiEndpoint = endpointPath.includes('/api/ai/');
+  const serviceLabel = isAiEndpoint ? 'AI service' : 'API service';
+
   const message =
     data.error ||
     (res.status === 413
       ? 'Uploaded file exceeds server upload limit. Please keep files under 4 MB.'
-      : `AI service error (HTTP ${res.status}). Please retry.`);
+      : res.status === 405
+        ? `Request rejected with HTTP 405 (Method Not Allowed)${endpointPath ? ` on ${endpointPath}` : ''}. Please verify API routing and retry.`
+        : `${serviceLabel} error (HTTP ${res.status}). Please retry.`);
   return new AiApiClientError(
     res.status,
     data.code || `HTTP_${res.status}`,
@@ -146,7 +169,7 @@ async function parseErrorResponse(res: Response): Promise<AiApiClientError> {
 }
 
 export async function checkBackendHealth(): Promise<HealthStatus> {
-  const res = await fetch('/api/health');
+  const res = await fetch(resolveApiUrl('/api/health'));
   if (!res.ok) {
     throw new Error(`Health check failed with status: ${res.status}`);
   }
@@ -154,7 +177,7 @@ export async function checkBackendHealth(): Promise<HealthStatus> {
 }
 
 export async function fetchAuthCapabilities(): Promise<AuthCapabilities> {
-  const res = await fetch('/api/auth/capabilities');
+  const res = await fetch(resolveApiUrl('/api/auth/capabilities'));
   if (!res.ok) {
     throw await parseErrorResponse(res);
   }
@@ -189,7 +212,7 @@ export async function updateServerProfile(
   updates: Partial<UserProfile>
 ): Promise<UserProfile> {
   const res = await authFetch('/api/auth/profile', {
-    method: 'PATCH',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
