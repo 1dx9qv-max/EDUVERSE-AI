@@ -1,27 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Sparkles,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
-  BookOpen,
-  GraduationCap,
-  Target,
-  Globe,
-  Clock,
-  Check,
-  MapPin,
-  Languages,
-  AtSign,
-  Loader2,
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  AtSign,
+  BookOpen,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  Globe,
+  GraduationCap,
+  Languages,
+  Loader2,
+  MapPin,
+  Target,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
+  AVAILABLE_SUBJECTS_BY_GRADE,
+  CLASS_GRADES,
   INDIAN_BOARDS,
   INDIAN_STATES,
-  CLASS_GRADES,
-  AVAILABLE_SUBJECTS_BY_GRADE,
   POPULAR_LEARNING_GOALS,
 } from '../../utils/curriculum';
 import {
@@ -30,7 +29,7 @@ import {
   STUDENT_AVATAR_PRESETS,
   validateUsernameFormat,
 } from '../../utils/usernameValidation';
-import { IndianBoard, ClassGrade, PreferredLanguage } from '../../types/auth';
+import { ClassGrade, IndianBoard, PreferredLanguage } from '../../types/auth';
 import { Button } from '../common/Button';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
@@ -40,7 +39,6 @@ export const OnboardingWizard: React.FC = () => {
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Form State
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [usernameInput, setUsernameInput] = useState(user?.username || '');
   const [avatarId, setAvatarId] = useState(user?.avatarId || DEFAULT_AVATAR_ID);
@@ -56,21 +54,19 @@ export const OnboardingWizard: React.FC = () => {
   const [language, setLanguage] = useState<PreferredLanguage>(
     user?.language === 'Bilingual' ? 'Hinglish' : user?.language || 'English'
   );
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => {
-    return user?.subjects && user.subjects.length > 0
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() =>
+    user?.subjects && user.subjects.length > 0
       ? user.subjects
-      : (AVAILABLE_SUBJECTS_BY_GRADE[user?.classGrade || 'Class 10'] || []).slice(0, 4);
-  });
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(() => {
-    return user?.learningGoals && user.learningGoals.length > 0
+      : (AVAILABLE_SUBJECTS_BY_GRADE[user?.classGrade || 'Class 10'] || []).slice(0, 4)
+  );
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(() =>
+    user?.learningGoals && user.learningGoals.length > 0
       ? user.learningGoals
-      : [POPULAR_LEARNING_GOALS[0], POPULAR_LEARNING_GOALS[1]];
-  });
-  const [dailyMinutes, setDailyMinutes] = useState(45);
+      : [POPULAR_LEARNING_GOALS[0], POPULAR_LEARNING_GOALS[1]]
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Live username format & uniqueness validation
   useEffect(() => {
     const raw = usernameInput.trim();
     if (!raw) {
@@ -102,7 +98,11 @@ export const OnboardingWizard: React.FC = () => {
         if (!res.valid) {
           setUsernameStatus({ state: 'invalid', message: res.error, normalized: res.normalized });
         } else if (!res.available) {
-          setUsernameStatus({ state: 'taken', message: res.error || `@${res.normalized} is already taken.`, normalized: res.normalized });
+          setUsernameStatus({
+            state: 'taken',
+            message: res.error || `@${res.normalized} is already taken.`,
+            normalized: res.normalized,
+          });
         } else {
           setUsernameStatus({
             state: 'available',
@@ -172,7 +172,7 @@ export const OnboardingWizard: React.FC = () => {
       setStep(3);
     } else if (step === 3) {
       if (selectedSubjects.length === 0) {
-        setError('Please select at least one subject to personalize your learning path.');
+        setError('Please select at least one subject to personalize your exam workspace.');
         return;
       }
       setStep(4);
@@ -188,7 +188,7 @@ export const OnboardingWizard: React.FC = () => {
 
   const handleSubmit = async () => {
     if (selectedGoals.length === 0) {
-      setError('Please choose at least one learning goal.');
+      setError('Please choose at least one exam preparation goal.');
       return;
     }
     const cleanUsername = normalizeUsername(usernameInput);
@@ -213,26 +213,26 @@ export const OnboardingWizard: React.FC = () => {
         language,
         subjects: selectedSubjects,
         learningGoals: selectedGoals,
-        dailyGoalMinutes: dailyMinutes,
       });
-    } catch (err: any) {
-      setError(err?.message || 'Error saving onboarding profile');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error saving onboarding profile');
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-6 sm:py-10 px-4 animate-in fade-in duration-300">
+    <div className="max-w-3xl mx-auto py-6 sm:py-10 px-4">
       <div className="text-center space-y-3 mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Personal Student Setup • Step {step} of 4</span>
+        <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+          <CalendarDays className="w-4 h-4" />
+          <span>Student Setup • Step {step} of 4</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-          Personalize Your Eduverse AI Profile
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          Personalize Your Exam Preparation Profile
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-          Claim your unique handle, select your avatar, and align with your Class 6–12 Indian board curriculum.
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+          Claim your @username, choose your avatar, and align EDUVERSE AI with your board, class,
+          and exam subjects.
         </p>
 
         <div className="flex items-center justify-center gap-2 max-w-xs mx-auto pt-2">
@@ -240,93 +240,94 @@ export const OnboardingWizard: React.FC = () => {
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                s <= step ? 'bg-indigo-500' : 'bg-slate-800'
+                s <= step ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800'
               }`}
             />
           ))}
         </div>
       </div>
 
-      <Card className="p-6 sm:p-8 space-y-6 bg-slate-900/90 border border-slate-800">
+      <Card className="p-6 sm:p-8 space-y-6">
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* STEP 1: Display Name, Unique Username, Avatar, Board & State */}
+        {/* STEP 1 */}
         {step === 1 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-6">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Identity, Handle &amp; Board
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Set your display name, claim a globally unique @username, and select your educational board.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Set your display name, claim a unique @username, and select your educational board.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 block">
-                  Display Name <span className="text-rose-400">*</span>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  Display Name <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your full or preferred name"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                   autoFocus
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 block">
-                  Unique Username <span className="text-rose-400">*</span>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  Unique Username <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <AtSign className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <AtSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    onChange={(e) =>
+                      setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+                    }
                     placeholder="e.g. rohan_cbse10"
                     maxLength={24}
-                    className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                   />
                 </div>
                 {usernameStatus.state === 'checking' && (
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     {usernameStatus.message}
                   </p>
                 )}
                 {usernameStatus.state === 'available' && (
-                  <p className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                     {usernameStatus.message}
                   </p>
                 )}
                 {(usernameStatus.state === 'invalid' || usernameStatus.state === 'taken') && (
-                  <p className="text-[11px] text-rose-400 flex items-center gap-1.5">
+                  <p className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     {usernameStatus.message}
                   </p>
                 )}
                 {usernameStatus.state === 'idle' && (
                   <p className="text-[11px] text-slate-500">
-                    3–24 chars: lowercase letters, numbers, underscores. Used as your unique profile handle.
+                    3–24 chars: lowercase letters, numbers, underscores.
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Avatar Selector */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                 Profile Avatar Badge
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
@@ -339,16 +340,16 @@ export const OnboardingWizard: React.FC = () => {
                       onClick={() => setAvatarId(preset.id)}
                       className={`p-2.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                         selected
-                          ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500'
-                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                          ? 'bg-indigo-50 dark:bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500'
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
                       <div
-                        className={`w-9 h-9 rounded-full bg-gradient-to-tr ${preset.gradient} flex items-center justify-center text-xs font-extrabold text-white shadow`}
+                        className={`w-9 h-9 rounded-full bg-gradient-to-tr ${preset.gradient} flex items-center justify-center text-xs font-extrabold text-white shadow-xs`}
                       >
                         {(displayName.trim() || 'S').charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">
+                      <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate max-w-full">
                         {preset.label.split(' ')[0]}
                       </span>
                     </button>
@@ -357,10 +358,9 @@ export const OnboardingWizard: React.FC = () => {
               </div>
             </div>
 
-            {/* Board Selector */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">
-                Educational Board <span className="text-rose-400">*</span>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                Educational Board <span className="text-rose-500">*</span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {INDIAN_BOARDS.map((b) => (
@@ -370,30 +370,35 @@ export const OnboardingWizard: React.FC = () => {
                     onClick={() => setBoard(b.id)}
                     className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
                       board === b.id
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md shadow-indigo-500/10'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-indigo-50 dark:bg-indigo-600/20 border-indigo-500 text-slate-900 dark:text-white'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-white">{b.label}</span>
-                      {board === b.id && <Check className="w-4 h-4 text-indigo-400" />}
+                      <span className="font-bold text-sm text-slate-900 dark:text-white">
+                        {b.label}
+                      </span>
+                      {board === b.id && (
+                        <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      )}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{b.full}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
+                      {b.full}
+                    </p>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* State Selector */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 Home State / UT
               </label>
               <select
                 value={state}
                 onChange={(e) => setState(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
+                className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
                 {INDIAN_STATES.map((st) => (
                   <option key={st} value={st}>
@@ -405,22 +410,23 @@ export const OnboardingWizard: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 2: Class Grade and Preferred Language */}
+        {/* STEP 2 */}
         {step === 2 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-6">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-400" />
-                Select Your Class &amp; Instruction Language
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                Select Your Class &amp; Preferred Medium
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Eduverse AI customizes question difficulty and explanations to your grade.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Eduverse AI defaults datesheet parsing and upcoming modules to your grade and
+                study medium.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">
-                Class / Grade (6 to 12) <span className="text-rose-400">*</span>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                Class / Grade (6 to 12) <span className="text-rose-500">*</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {CLASS_GRADES.map((g) => (
@@ -430,8 +436,8 @@ export const OnboardingWizard: React.FC = () => {
                     onClick={() => handleGradeChange(g)}
                     className={`py-3 px-3 rounded-xl border text-center font-bold text-sm transition-all cursor-pointer ${
                       classGrade === g
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
-                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     {g}
@@ -441,15 +447,27 @@ export const OnboardingWizard: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Languages className="w-3.5 h-3.5 text-indigo-400" />
-                Preferred Language for Explanations &amp; Voice Teacher
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                Preferred Study Medium
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
-                  { id: 'English', label: 'English Medium', desc: 'Standard NCERT English terminology' },
-                  { id: 'Hindi', label: 'हिन्दी माध्यम', desc: 'Complete Hindi explanations & terms' },
-                  { id: 'Hinglish', label: 'Hinglish (Bilingual)', desc: 'Conversational Hindi + English mix' },
+                  {
+                    id: 'English',
+                    label: 'English Medium',
+                    desc: 'Standard NCERT English terminology',
+                  },
+                  {
+                    id: 'Hindi',
+                    label: 'हिन्दी माध्यम',
+                    desc: 'Complete Hindi study terminology',
+                  },
+                  {
+                    id: 'Hinglish',
+                    label: 'Hinglish (Bilingual)',
+                    desc: 'Conversational Hindi + English mix',
+                  },
                 ].map((lang) => (
                   <button
                     key={lang.id}
@@ -457,15 +475,21 @@ export const OnboardingWizard: React.FC = () => {
                     onClick={() => setLanguage(lang.id as PreferredLanguage)}
                     className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer ${
                       language === lang.id
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-indigo-50 dark:bg-indigo-600/20 border-indigo-500 text-slate-900 dark:text-white'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-white">{lang.label}</span>
-                      {language === lang.id && <Check className="w-4 h-4 text-indigo-400" />}
+                      <span className="font-bold text-sm text-slate-900 dark:text-white">
+                        {lang.label}
+                      </span>
+                      {language === lang.id && (
+                        <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      )}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1">{lang.desc}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                      {lang.desc}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -473,20 +497,22 @@ export const OnboardingWizard: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 3: Enrolled Subjects */}
+        {/* STEP 3 */}
         {step === 3 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-indigo-400" />
-                  Your Subjects for {classGrade}
+                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  Your Exam Subjects for {classGrade}
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Select the subjects you want tracked on your dashboard and question practice.
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Select the subjects appearing in your school or board exams.
                 </p>
               </div>
-              <Badge variant="purple" size="sm">{board}</Badge>
+              <Badge variant="purple" size="sm">
+                {board}
+              </Badge>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -499,33 +525,35 @@ export const OnboardingWizard: React.FC = () => {
                     onClick={() => toggleSubject(sub)}
                     className={`p-3.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                       isChecked
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-indigo-50 dark:bg-indigo-600/20 border-indigo-500 text-slate-900 dark:text-white'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold ${
                           isChecked
-                            ? 'bg-indigo-600 border-indigo-500 text-white'
-                            : 'border-slate-700 bg-slate-900 text-transparent'
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-transparent'
                         }`}
                       >
                         ✓
                       </div>
-                      <span className="text-xs font-semibold text-white">{sub}</span>
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white">
+                        {sub}
+                      </span>
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex justify-between items-center text-xs text-slate-400 pt-1">
+            <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 pt-1">
               <span>{selectedSubjects.length} subjects selected</span>
               <button
                 type="button"
                 onClick={() => setSelectedSubjects(AVAILABLE_SUBJECTS_BY_GRADE[classGrade] || [])}
-                className="text-indigo-400 hover:underline cursor-pointer"
+                className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer"
               >
                 Select All Subjects
               </button>
@@ -533,22 +561,22 @@ export const OnboardingWizard: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 4: Goals & Daily Commitment */}
+        {/* STEP 4 */}
         {step === 4 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-6">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Target className="w-5 h-5 text-indigo-400" />
-                Learning Goals &amp; Daily Target
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Target className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                Exam Preparation Priorities
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Set milestones to guide your daily study streak and adaptive recommendations.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Choose the exam outcomes you want your EDUVERSE AI workspace focused on.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">
-                Primary Academic Goals
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                Primary Exam Goals <span className="text-rose-500">*</span>
               </label>
               <div className="space-y-2">
                 {POPULAR_LEARNING_GOALS.map((goal) => {
@@ -558,18 +586,20 @@ export const OnboardingWizard: React.FC = () => {
                       key={goal}
                       type="button"
                       onClick={() => toggleGoal(goal)}
-                      className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                      className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
                         isChecked
-                          ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                          ? 'bg-indigo-50 dark:bg-indigo-600/20 border-indigo-500 text-slate-900 dark:text-white'
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
-                      <span className="text-xs font-medium text-slate-200">{goal}</span>
+                      <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                        {goal}
+                      </span>
                       <div
-                        className={`w-4 h-4 rounded-md flex items-center justify-center border text-[10px] font-bold ${
+                        className={`w-4 h-4 rounded-md flex items-center justify-center border text-[10px] font-bold shrink-0 ${
                           isChecked
-                            ? 'bg-indigo-600 border-indigo-500 text-white'
-                            : 'border-slate-700 bg-slate-900 text-transparent'
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-transparent'
                         }`}
                       >
                         ✓
@@ -579,36 +609,10 @@ export const OnboardingWizard: React.FC = () => {
                 })}
               </div>
             </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                  Daily Study Target Commitment
-                </label>
-                <span className="text-xs font-extrabold text-indigo-400">
-                  {dailyMinutes} Minutes / Day
-                </span>
-              </div>
-              <input
-                type="range"
-                min="15"
-                max="120"
-                step="15"
-                value={dailyMinutes}
-                onChange={(e) => setDailyMinutes(Number(e.target.value))}
-                className="w-full accent-indigo-500 cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-slate-500">
-                <span>15 mins (Light)</span>
-                <span>45 mins (Recommended)</span>
-                <span>120 mins (Intensive)</span>
-              </div>
-            </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+        <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
           {step > 1 ? (
             <Button
               type="button"

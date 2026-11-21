@@ -1,21 +1,17 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { UserRole } from '../src/types/auth.ts';
-import type { AccountStatus } from '../src/types/phase8.ts';
 import {
-  canPerformAdminMutation,
   sanitizeClientErrorMessage,
   screenAgeAppropriateContent,
   SlidingWindowRateLimiter,
 } from '../src/utils/securityEngine.ts';
-import { validateAttachmentMetadata } from '../src/utils/aiValidation.ts';
+import { validateDatesheetUploadBatch } from '../src/utils/datesheetEngine.ts';
 import { verifyFirebaseIdToken } from './firebaseJwt.ts';
 import {
   BOOTSTRAP_ADMIN_EMAIL,
   getUserAccountForAuth,
-  recordAiRateLimitBlock,
-  recordAiRequestMetric,
-  recordAiSafetyFlag,
-} from './adminStore.ts';
+  type AccountStatus,
+} from './accountStore.ts';
 
 export interface VerifiedRequestAuth {
   authenticated: boolean;
@@ -84,7 +80,7 @@ export async function requireAuth(
     }
     if (authCtx.accountStatus === 'suspended') {
       res.status(403).json({
-        error: 'This account has been suspended by an administrator.',
+        error: 'This account is currently suspended.',
         code: 'ACCOUNT_SUSPENDED',
         retryable: false,
       });
@@ -95,40 +91,6 @@ export async function requireAuth(
   } catch (err) {
     res.status(401).json({
       error: sanitizeClientErrorMessage(err) || 'Invalid authentication credentials.',
-      code: 'INVALID_AUTH_TOKEN',
-      retryable: false,
-    });
-  }
-}
-
-export async function requireAdmin(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const authCtx = await resolveVerifiedAuthFromRequest(req);
-    if (!authCtx) {
-      res.status(401).json({
-        error: 'Administrator authentication is required.',
-        code: 'UNAUTHENTICATED',
-        retryable: false,
-      });
-      return;
-    }
-    if (!canPerformAdminMutation(authCtx)) {
-      res.status(403).json({
-        error: 'Forbidden: verified administrator privileges required. Frontend role claims are never accepted.',
-        code: 'ADMIN_REQUIRED',
-        retryable: false,
-      });
-      return;
-    }
-    (req as AuthenticatedRequest).verifiedAuth = authCtx;
-    next();
-  } catch {
-    res.status(401).json({
-      error: 'Invalid or expired administrator authentication token.',
       code: 'INVALID_AUTH_TOKEN',
       retryable: false,
     });
@@ -149,7 +111,7 @@ export function createAiRateLimitMiddleware() {
         (await resolveVerifiedAuthFromRequest(req).catch(() => null));
       if (!authCtx) {
         res.status(401).json({
-          error: 'Authentication is required to access AI learning endpoints.',
+          error: 'Authentication is required to access AI endpoints.',
           code: 'UNAUTHENTICATED',
           retryable: false,
         });
@@ -157,17 +119,15 @@ export function createAiRateLimitMiddleware() {
       }
       if (authCtx.accountStatus === 'suspended') {
         res.status(403).json({
-          error: 'This account is currently suspended from AI classroom features.',
+          error: 'This account is currently suspended.',
           code: 'ACCOUNT_SUSPENDED',
           retryable: false,
         });
         return;
       }
 
-      const key = authCtx.uid;
-      const result = aiLimiter.check(key);
+      const result = aiLimiter.check(authCtx.uid);
       if (!result.allowed) {
-        recordAiRateLimitBlock();
         res.setHeader('Retry-After', String(result.retryAfterSeconds));
         res.status(429).json({
           error: `Too many AI requests in a short window. Please wait ${result.retryAfterSeconds}s before retrying.`,
@@ -177,7 +137,6 @@ export function createAiRateLimitMiddleware() {
         return;
       }
 
-      recordAiRequestMetric(req.path);
       (req as AuthenticatedRequest).verifiedAuth = authCtx;
       next();
     } catch (err) {
@@ -193,25 +152,15 @@ export function createAiRateLimitMiddleware() {
 export function aiSafetyMiddleware(req: Request, res: Response, next: NextFunction): void {
   const body = (req.body || {}) as Record<string, unknown>;
   const textFields = [
-    body.message,
-    body.question,
-    body.topic,
-    body.text,
-    body.userAnswer,
-    body.studentAnswer,
-    body.prompt,
+    body.studentBoard,
+    body.studentClassGrade,
+    body.notes,
   ]
     .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
     .join('\n');
 
   const safety = screenAgeAppropriateContent(textFields);
   if (!safety.safe) {
-    recordAiSafetyFlag(
-      req.path,
-      textFields,
-      safety.category || 'safety-policy',
-      getVerifiedAuth(req)?.displayName || 'Student Request'
-    );
     res.status(400).json({
       error: safety.reason || 'Request blocked by K-12 student safety policy.',
       code: 'AGE_SAFETY_BLOCKED',
@@ -220,24 +169,19 @@ export function aiSafetyMiddleware(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  // Server-side magic-byte and filename check for uploaded Doubt Solver attachments
-  if (body.attachment && typeof body.attachment === 'object') {
-    const att = body.attachment as Record<string, unknown>;
-    const rawBase64 =
-      typeof att.dataBase64 === 'string'
-        ? att.dataBase64
-        : typeof att.base64Data === 'string'
-        ? att.base64Data
-        : undefined;
-    const check = validateAttachmentMetadata({
-      fileName: typeof att.fileName === 'string' ? att.fileName : '',
-      mimeType: typeof att.mimeType === 'string' ? att.mimeType : '',
-      sizeBytes: typeof att.sizeBytes === 'number' ? att.sizeBytes : 0,
-      dataBase64: rawBase64,
-    });
+  if (Array.isArray(body.files)) {
+    const check = validateDatesheetUploadBatch(
+      body.files as Array<{
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        pageCount?: number;
+        dataBase64: string;
+      }>
+    );
     if (!check.valid) {
       res.status(400).json({
-        error: check.error || 'Uploaded attachment failed security validation.',
+        error: check.error || 'Uploaded datesheet file failed security validation.',
         code: 'UNSAFE_ATTACHMENT',
         retryable: false,
       });

@@ -23,7 +23,6 @@ import {
   UserProfile,
   UserRole,
 } from '../types/auth';
-import { LearningProfile } from '../types/curriculum';
 import {
   deleteAccountOnServer,
   fetchServerProfile,
@@ -64,7 +63,7 @@ interface AuthContextType {
   }>;
   updateProfileSettings: (updates: Partial<UserProfile>) => Promise<void>;
   completeOnboarding: (
-    onboardingData: Partial<UserProfile> & { username: string; dailyGoalMinutes?: number }
+    onboardingData: Partial<UserProfile> & { username: string }
   ) => Promise<void>;
   deleteAccount: () => Promise<{ firebaseAuthDeleted: boolean }>;
   signOut: () => Promise<void>;
@@ -118,7 +117,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avatarId: fsData.avatarId || serverProfile?.avatarId || DEFAULT_AVATAR_ID,
         photoURL: fbUser.photoURL || fsData.photoURL,
         role: resolvedRole,
-        streakDays: (fsData.xpPoints || 0) === 0 ? 0 : (fsData.streakDays || 0),
       };
 
       if (merged.username && (!serverProfile?.username || !serverProfile?.onboardingCompleted)) {
@@ -168,8 +166,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       learningGoals: [],
       onboardingCompleted: Boolean(serverProfile?.onboardingCompleted && serverProfile?.username),
       username: serverProfile?.username,
-      streakDays: 0,
-      xpPoints: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -345,8 +341,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sanitizedUpdates = { ...updates } as Record<string, unknown>;
     delete sanitizedUpdates.role;
     delete sanitizedUpdates.uid;
-    delete sanitizedUpdates.streakDays;
-    delete sanitizedUpdates.xpPoints;
     for (const key of Object.keys(sanitizedUpdates)) {
       if (sanitizedUpdates[key] === undefined) {
         delete sanitizedUpdates[key];
@@ -403,7 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeOnboarding = async (
-    onboardingData: Partial<UserProfile> & { username: string; dailyGoalMinutes?: number }
+    onboardingData: Partial<UserProfile> & { username: string }
   ) => {
     if (!firebaseUser || !user) {
       throw new Error('Authentication is required to complete onboarding.');
@@ -447,31 +441,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       language: safeProfileUpdates.language,
       onboardingCompleted: true,
     });
-
-    const targetDailyMinutes =
-      typeof onboardingData.dailyGoalMinutes === 'number' &&
-      onboardingData.dailyGoalMinutes >= 15 &&
-      onboardingData.dailyGoalMinutes <= 180
-        ? onboardingData.dailyGoalMinutes
-        : 45;
-
-    try {
-      const learningProfileRef = doc(db, 'learning_profiles', firebaseUser.uid);
-      const lpData: LearningProfile = {
-        id: firebaseUser.uid,
-        userId: firebaseUser.uid,
-        preferredPace: 'steady',
-        strengths: [],
-        weaknesses: [],
-        dailyGoalMinutes: targetDailyMinutes,
-        dailyQuestionsTarget: 10,
-        lastActiveDate: now,
-        updatedAt: now,
-      };
-      await setDoc(learningProfileRef, lpData, { merge: true });
-    } catch (err) {
-      console.warn('[Auth] Onboarding auxiliary setup warning:', err);
-    }
 
     setUser((prev) =>
       prev

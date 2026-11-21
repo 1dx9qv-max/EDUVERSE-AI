@@ -5,7 +5,7 @@ import {
   getUserAccountForAuth,
   isUsernameAvailableOnServer,
   updateOwnProfileOnServer,
-} from './adminStore.ts';
+} from './accountStore.ts';
 import {
   getSafePublicErrorMessage,
   getVerifiedAuth,
@@ -80,7 +80,7 @@ export function createAuthRouter(): Router {
         board: typeof body.board === 'string' ? (body.board as any) : undefined,
         classGrade: typeof body.classGrade === 'string' ? (body.classGrade as any) : undefined,
         state: typeof body.state === 'string' ? body.state : undefined,
-        language: typeof body.language === 'string' ? body.language : undefined,
+        language: typeof body.language === 'string' ? (body.language as any) : undefined,
         onboardingCompleted:
           typeof body.onboardingCompleted === 'boolean' ? body.onboardingCompleted : undefined,
         username: typeof body.username === 'string' ? body.username : undefined,
@@ -110,9 +110,7 @@ export function createAuthRouter(): Router {
     const auth = getVerifiedAuth(req)!;
     try {
       deleteUserAccountFromServer(auth.uid);
-      res.json({
-        deleted: true,
-      });
+      res.json({ deleted: true });
     } catch (err) {
       res.status(500).json({
         error: getSafePublicErrorMessage(err) || 'Failed to delete account cleanly.',

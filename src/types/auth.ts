@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'guardian' | 'teacher' | 'admin';
+export type UserRole = 'student' | 'admin';
 
 export type IndianBoard = 'CBSE' | 'CISCE' | 'ICSE' | 'ISC' | 'StateBoard' | 'Other';
 
@@ -32,8 +32,9 @@ export interface UserProfile {
   subjects?: string[];
   learningGoals?: string[];
   onboardingCompleted?: boolean;
-  streakDays: number;
-  xpPoints: number;
+  // Kept optional for backwards-compatibility with existing Firestore user documents
+  streakDays?: number;
+  xpPoints?: number;
   createdAt: string;
   updatedAt: string;
 }

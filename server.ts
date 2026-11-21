@@ -3,8 +3,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { apiRouter } from './server/api.ts';
-import { attachVoiceLiveWebSocket } from './server/voiceLive.ts';
-import { attachStudyRoomWebSocket } from './server/studyRooms.ts';
 
 dotenv.config();
 
@@ -19,19 +17,6 @@ app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
-});
-
-app.use(express.json({ limit: '10mb' }));
-app.use((err: { type?: string } | null, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err && err.type === 'entity.too.large') {
-    res.status(413).json({
-      error: 'Uploaded payload exceeds server limit. Please keep attachments under 4 MB.',
-      code: 'PAYLOAD_TOO_LARGE',
-      retryable: false,
-    });
-    return;
-  }
-  next(err);
 });
 
 app.use('/api', (req, res, next) => {
@@ -56,10 +41,36 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Mount API routes
+app.use(express.json({ limit: '12mb' }));
+app.use(
+  (
+    err: { type?: string; status?: number } | null,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (err && err.type === 'entity.too.large') {
+      res.status(413).json({
+        error: 'Uploaded payload exceeds server limit. Please keep total datesheet files under 6 MB.',
+        code: 'PAYLOAD_TOO_LARGE',
+        retryable: false,
+      });
+      return;
+    }
+    if (err && (err.type === 'entity.parse.failed' || err.status === 400)) {
+      res.status(400).json({
+        error: 'Malformed JSON request payload.',
+        code: 'INVALID_JSON',
+        retryable: false,
+      });
+      return;
+    }
+    next(err);
+  }
+);
+
 app.use('/api', apiRouter);
 
-// In production, serve the built Vite SPA
 const distPath = path.resolve(__dirname, 'dist');
 app.use(express.static(distPath));
 
@@ -70,5 +81,5 @@ app.get('*', (_req, res) => {
 const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`EDUVERSE AI server listening on http://0.0.0.0:${PORT}`);
 });
-attachVoiceLiveWebSocket(httpServer);
-attachStudyRoomWebSocket(httpServer);
+httpServer.keepAliveTimeout = 65_000;
+httpServer.headersTimeout = 66_000;

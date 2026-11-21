@@ -3,33 +3,24 @@ export type AppRoute =
   | '/login'
   | '/signup'
   | '/dashboard'
-  | '/ai-teacher'
-  | '/doubt-solver'
-  | '/visual-lab'
-  | '/practice'
-  | '/learning-intelligence'
-  | '/memory-booster'
-  | '/mindmaps'
-  | '/exam-simulator'
-  | '/voice-learning'
-  | '/collaborative-learning'
-  | '/achievements'
-  | '/guardian'
-  | '/settings'
-  | '/admin';
+  | '/datesheet-analyzer'
+  | '/study-planner'
+  | '/sample-papers'
+  | '/exam-mode'
+  | '/personal-advisor'
+  | '/settings';
 
-export type ModuleCategory = 'core' | 'ai-tutor' | 'exam-prep' | 'cognitive' | 'collaboration' | 'system';
+export type ModuleCategory = 'overview' | 'core' | 'system';
 
 export interface ModuleMetadata {
   path: AppRoute;
   title: string;
-  hindiTitle: string;
+  shortTitle?: string;
   category: ModuleCategory;
   description: string;
   iconName: string;
+  status: 'active' | 'coming-soon';
   badge?: string;
-  badgeColor?: string;
-  status: 'active' | 'coming-soon' | 'foundation-ready' | 'planned';
-  allowedRoles?: ('student' | 'guardian' | 'teacher' | 'admin')[];
   features: string[];
+  moduleNumber?: number;
 }

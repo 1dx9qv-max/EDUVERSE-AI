@@ -1,377 +1,91 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Sparkles,
-  Flame,
-  Target,
-  BookOpen,
+  AlertTriangle,
   ArrowRight,
-  Bot,
-  HelpCircle,
-  Atom,
-  Clock,
-  TrendingUp,
-  RotateCcw,
-  BrainCircuit,
-  FileText,
-  Mic,
-  Users2,
-  Trophy,
-  Play,
-  MapPin,
-  Compass,
-  RefreshCw,
+  CalendarDays,
   CheckCircle2,
-  SkipForward,
+  ClipboardList,
+  Clock,
+  Compass,
+  FileText,
+  History,
+  Info,
+  MapPin,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../router/Router';
-import {
-  DashboardLearningSyncRequest,
-  refreshServerRecommendations,
-  submitRecommendationAction,
-} from '../api/client';
-import { loadDynamicDashboardSummary } from '../lib/firestoreService';
-import { sortDailyRevisionQueue } from '../utils/memoryEngine';
-import { getLocalDateKey } from '../utils/recommendationEngine';
-import { DoubtTicket } from '../types/ai';
-import { FlashcardRecord, TopicMasteryRecord } from '../types/phase4';
-import {
-  AdaptivePracticeRecommendation,
-  ChapterProgressSummary,
-  DashboardLearningSummary,
-} from '../types/learning';
+import { CORE_EXAM_MODULES } from '../constants/navigation';
+import { fetchExamActivities, fetchExamDatesheets } from '../lib/firestoreService';
+import type { ExamActivityItem, SavedDatesheet } from '../types/datesheet';
+import { buildDashboardExamSummary, formatDisplayDate } from '../utils/datesheetEngine';
+import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
-import { Badge } from '../components/common/Badge';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
-import { FEATURE_FLAGS } from '../config/featureFlags';
-import { VisualLearningComingSoonCard } from '../components/visual-lab/VisualLearningComingSoonCard';
+
+const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  CalendarDays,
+  ClipboardList,
+  FileText,
+  Clock,
+  Compass,
+};
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { navigate } = useRouter();
 
-  const board = user?.board || 'CBSE';
-  const grade = user?.classGrade || 'Class 10';
-  const state = user?.state || 'Delhi (NCT)';
+  const [datesheets, setDatesheets] = useState<SavedDatesheet[]>([]);
+  const [activities, setActivities] = useState<ExamActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [summary, setSummary] = useState<DashboardLearningSummary | null>(null);
-  const [recentDoubts, setRecentDoubts] = useState<DoubtTicket[]>([]);
-  const [dueFlashcards, setDueFlashcards] = useState<FlashcardRecord[]>([]);
-  const [topicMasteryList, setTopicMasteryList] = useState<TopicMasteryRecord[]>([]);
-  const [loadingDashboard, setLoadingDashboard] = useState<boolean>(true);
-  const [refreshingRecs, setRefreshingRecs] = useState<boolean>(false);
-  const [actingRecId, setActingRecId] = useState<string | null>(null);
-  const [selectedChapterSubject, setSelectedChapterSubject] = useState<string>('All');
-  const lastLoadedDateRef = useRef<string>(getLocalDateKey(new Date()));
-
-  const buildSyncContextPayload = useCallback(
-    (overrideRecs?: AdaptivePracticeRecommendation[]): DashboardLearningSyncRequest => {
-      const timezone =
-        typeof Intl !== 'undefined'
-          ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-          : 'UTC';
-      const localDateKey = getLocalDateKey(new Date(), timezone);
-      return {
-        board: user?.board,
-        classGrade: user?.classGrade,
-        subjects: user?.subjects || [],
-        learningGoals: user?.learningGoals || [],
-        localDateKey,
-        timezone,
-        currentRecIds: (overrideRecs || summary?.recommendations || []).map((r) => r.id),
-      };
-    },
-    [user?.board, user?.classGrade, user?.subjects, user?.learningGoals, summary?.recommendations]
-  );
-
-  const loadDashboard = useCallback(async () => {
+  const loadExamWorkspace = useCallback(async () => {
     if (!user?.uid) {
-      setLoadingDashboard(false);
+      setLoading(false);
       return;
     }
     try {
-      const result = await loadDynamicDashboardSummary(user);
-      setSummary(result.summary);
-      setRecentDoubts(result.recentDoubts.slice(0, 3));
-      setDueFlashcards(sortDailyRevisionQueue(result.dueFlashcards).slice(0, 3));
-      setTopicMasteryList(result.topicMastery.slice(0, 4));
-      lastLoadedDateRef.current = result.summary.localDateKey;
+      const [loadedDatesheets, loadedActivities] = await Promise.all([
+        fetchExamDatesheets(user.uid),
+        fetchExamActivities(user.uid),
+      ]);
+      setDatesheets(loadedDatesheets);
+      setActivities(loadedActivities);
     } catch {
-      // Keep honest zeroed defaults when offline / unavailable
+      // Keep honest empty state if unavailable
     } finally {
-      setLoadingDashboard(false);
+      setLoading(false);
     }
-  }, [user]);
+  }, [user?.uid]);
 
   useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+    void loadExamWorkspace();
+  }, [loadExamWorkspace]);
 
-  // Refresh cleanly whenever any learning module records an event
   useEffect(() => {
     const onDirty = () => {
-      void loadDashboard();
+      void loadExamWorkspace();
     };
-    window.addEventListener('eduverse:stats-dirty', onDirty);
-    return () => window.removeEventListener('eduverse:stats-dirty', onDirty);
-  }, [loadDashboard]);
+    window.addEventListener('eduverse:datesheet-dirty', onDirty);
+    return () => window.removeEventListener('eduverse:datesheet-dirty', onDirty);
+  }, [loadExamWorkspace]);
 
-  // Automatic local midnight rollover check (every 60s)
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const currentLocalDate = getLocalDateKey(new Date());
-      if (currentLocalDate !== lastLoadedDateRef.current) {
-        void loadDashboard();
-      }
-    }, 60_000);
-    return () => window.clearInterval(timer);
-  }, [loadDashboard]);
+  const summary = useMemo(() => buildDashboardExamSummary(datesheets), [datesheets]);
 
-  // Hooks above onboarding guard — compute chapter tabs unconditionally
-  const chapterProgressList: ChapterProgressSummary[] = useMemo(
-    () => summary?.chapterProgress || [],
-    [summary?.chapterProgress]
-  );
-
-  const availableSubjects = useMemo(() => {
-    const set = new Set<string>();
-    for (const ch of chapterProgressList) {
-      if (ch.subject) set.add(ch.subject);
-    }
-    return ['All', ...Array.from(set)];
-  }, [chapterProgressList]);
-
-  const visibleChapters = useMemo(() => {
-    const filtered =
-      selectedChapterSubject === 'All'
-        ? chapterProgressList
-        : chapterProgressList.filter((c) => c.subject === selectedChapterSubject);
-    return filtered.slice(0, 4);
-  }, [chapterProgressList, selectedChapterSubject]);
-
-  // If user onboarding is incomplete, show the wizard
   if (user && user.onboardingCompleted === false) {
     return <OnboardingWizard />;
   }
 
-  const verifiedXp = summary?.verifiedXp ?? 0;
-  const streakDays = summary?.streakDays ?? 0;
-  const dailyGoals = summary?.dailyGoals || [];
-  const completedGoalsCount = dailyGoals.filter((g) => g.completed).length;
-  const totalGoalsCount = dailyGoals.length;
-  const dailyCompletionPct =
-    totalGoalsCount > 0 ? Math.round((completedGoalsCount / totalGoalsCount) * 100) : 0;
-  const earnedGoalXpToday = dailyGoals
-    .filter((g) => g.completed)
-    .reduce((acc, g) => acc + g.xpReward, 0);
-  const potentialGoalXp = dailyGoals.reduce((acc, g) => acc + g.xpReward, 0);
-
-  const recommendations = summary?.recommendations || [];
-  const hasAnyRealActivity =
-    verifiedXp > 0 ||
-    (summary?.totalCompletedActivities ?? 0) > 0 ||
-    recentDoubts.length > 0 ||
-    topicMasteryList.length > 0 ||
-    chapterProgressList.some((c) => c.status !== 'not_started');
-
-  const handleRefreshRecommendations = async () => {
-    if (refreshingRecs) return;
-    setRefreshingRecs(true);
-    try {
-      const ctx = buildSyncContextPayload();
-      const res = await refreshServerRecommendations({ ...ctx, refresh: true });
-      setSummary((prev) =>
-        prev
-          ? {
-              ...prev,
-              recommendations: res.recommendations,
-              recommendationRefreshCount: res.refreshCount,
-            }
-          : prev
-      );
-    } catch {
-      await loadDashboard();
-    } finally {
-      setRefreshingRecs(false);
-    }
-  };
-
-  const handleStartRecommendation = (rec: AdaptivePracticeRecommendation) => {
-    setActingRecId(rec.id);
-    submitRecommendationAction(rec.id, 'started', {
-      subject: rec.subject,
-      chapter: rec.chapter,
-      topic: rec.topic,
-      category: rec.category,
-    })
-      .catch(() => {})
-      .finally(() => setActingRecId(null));
-    navigate(rec.actionRoute);
-  };
-
-  const handleSkipRecommendation = async (rec: AdaptivePracticeRecommendation) => {
-    setActingRecId(rec.id);
-    try {
-      const ctx = buildSyncContextPayload();
-      const res = await submitRecommendationAction(
-        rec.id,
-        'skipped',
-        {
-          subject: rec.subject,
-          chapter: rec.chapter,
-          topic: rec.topic,
-          category: rec.category,
-        },
-        ctx
-      );
-      setSummary((prev) =>
-        prev ? { ...prev, recommendations: res.recommendations } : prev
-      );
-    } catch {
-      // Fallback: filter locally so student sees immediate response
-      setSummary((prev) =>
-        prev
-          ? {
-              ...prev,
-              recommendations: prev.recommendations.filter((r) => r.id !== rec.id),
-            }
-          : prev
-      );
-    } finally {
-      setActingRecId(null);
-    }
-  };
-
-  const openChapterLesson = (
-    chapter: ChapterProgressSummary,
-    target: 'ai-teacher' | 'visual-lab'
-  ) => {
-    const nextTopic =
-      chapter.topics.find((t) => !chapter.completedTopicTitles.includes(t)) ||
-      chapter.topics[0] ||
-      chapter.chapterTitle;
-    const params = new URLSearchParams({
-      subject: chapter.subject,
-      chapter: chapter.chapterTitle,
-      topic: nextTopic,
-    });
-    navigate(`/${target}?${params.toString()}`);
-  };
-
-  // 11 Core Modules Registry for Quick Access
-  const CORE_MODULES = [
-    {
-      id: 'ai-teacher',
-      title: 'AI Socratic Teacher',
-      desc: 'Interactive concept dialogue guiding understanding',
-      route: '/ai-teacher' as const,
-      icon: Bot,
-      badge: 'Interactive Dialogue',
-    },
-    {
-      id: 'doubt-solver',
-      title: 'Instant Doubt Solver',
-      desc: 'Step-by-step derivations & NCERT problem solving',
-      route: '/doubt-solver' as const,
-      icon: HelpCircle,
-      badge: 'Step-by-Step AI',
-    },
-    ...(FEATURE_FLAGS.visualLearningEnabled
-      ? [
-          {
-            id: 'visual-lab',
-            title: 'Visual Learning Lab',
-            desc: 'Simulations, animations & diagrams for Physics, Chem, Math, Bio & Geo',
-            route: '/visual-lab' as const,
-            icon: Atom,
-            badge: '5 Subjects',
-          },
-        ]
-      : []),
-    {
-      id: 'practice',
-      title: 'Adaptive Practice Bank',
-      desc: 'Board-pattern MCQs & assertion-reasoning engine',
-      route: '/practice' as const,
-      icon: Target,
-      badge: 'Adaptive MCQs',
-    },
-    {
-      id: 'learning-intelligence',
-      title: 'Learning Intelligence',
-      desc: 'Cognitive growth analysis & subject weak spot heatmaps',
-      route: '/learning-intelligence' as const,
-      icon: BrainCircuit,
-      badge: 'Analytics',
-    },
-    {
-      id: 'memory-booster',
-      title: 'Memory Booster',
-      desc: 'Spaced repetition flashcards with SM-2 recall algorithms',
-      route: '/memory-booster' as const,
-      icon: RotateCcw,
-      badge: 'Spaced Recall',
-    },
-    {
-      id: 'mindmaps',
-      title: 'AI Mind Map Studio',
-      desc: 'Generate, edit, link, save & export hierarchical concept maps (PNG/PDF)',
-      route: '/mindmaps' as const,
-      icon: Compass,
-      badge: 'PNG / PDF',
-    },
-    {
-      id: 'exam-simulator',
-      title: 'Exam Simulator',
-      desc: 'Timed AI practice mocks across 7 formats with server validation & analytics',
-      route: '/exam-simulator' as const,
-      icon: FileText,
-      badge: '7 Formats',
-    },
-    {
-      id: 'voice-learning',
-      title: 'Voice Learning Classroom',
-      desc: 'Live spoken AI teacher in Hindi, English & Bilingual mode with text fallback',
-      route: '/voice-learning' as const,
-      icon: Mic,
-      badge: 'Voice AI',
-    },
-    {
-      id: 'collaborative-learning',
-      title: 'Peer Study Pods',
-      desc: 'Invite-only study rooms, shared notes, group quizzes & mind maps',
-      route: '/collaborative-learning' as const,
-      icon: Users2,
-      badge: 'Live Pods',
-    },
-    {
-      id: 'achievements',
-      title: 'Badges & Trophy Hall',
-      desc: 'Verified streaks, healthy daily goals, mastery badges & progress timeline',
-      route: '/achievements' as const,
-      icon: Trophy,
-      badge: 'Healthy Habits',
-    },
-  ];
-
-  const getDifficultyBadgeVariant = (diff: AdaptivePracticeRecommendation['difficulty']) => {
-    if (diff === 'board-challenge') return 'rose' as const;
-    if (diff === 'intermediate') return 'warning' as const;
-    return 'default' as const;
-  };
-
-  const getDifficultyLabel = (diff: AdaptivePracticeRecommendation['difficulty']) => {
-    if (diff === 'board-challenge') return 'Board Challenge';
-    if (diff === 'intermediate') return 'Intermediate';
-    return 'Foundation';
-  };
+  const board = user?.board || 'CBSE';
+  const grade = user?.classGrade || 'Class 10';
+  const state = user?.state || 'Delhi (NCT)';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* 1. WELCOME SECTION */}
-      <div className="relative rounded-3xl overflow-hidden border border-indigo-500/20 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 p-6 sm:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-7">
+      {/* 1. EXAM WORKSPACE HEADER */}
+      <Card className="p-6 sm:p-8 border-indigo-200 dark:border-indigo-500/25">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="purple" size="md">
@@ -381,707 +95,409 @@ export const DashboardPage: React.FC = () => {
                 <MapPin className="w-3 h-3 inline mr-1" />
                 {state}
               </Badge>
-              <Badge variant="success" size="md">
-                Curriculum Aligned
+              <Badge variant="info" size="md">
+                {user?.language || 'English'} Medium
               </Badge>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Namaste, {user?.displayName || 'Scholar'}!
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Welcome back, {user?.displayName || 'Student'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-              {streakDays > 0 ? (
-                <>
-                  You are on a{' '}
-                  <strong className="text-amber-400 font-bold">
-                    {streakDays}-day active study streak
-                  </strong>
-                  !
-                </>
-              ) : (
-                <>
-                  Complete your first verified lesson, doubt, or practice set today to start your
-                  study streak.
-                </>
-              )}
-              <span className="italic block mt-1 text-slate-400">
-                “Vidya dadati vinayam (Knowledge bestows humility and true discipline).”
-              </span>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-2xl">
+              {summary.confirmedDatesheet
+                ? `Active exam schedule: ${summary.confirmedDatesheet.title}. Track upcoming papers, exam gaps, and upcoming preparation modules.`
+                : summary.latestDraftDatesheet
+                  ? `You have an unconfirmed draft datesheet ("${summary.latestDraftDatesheet.title}"). Confirm it in Module 1 to activate live exam countdowns.`
+                  : 'Upload your school or board exam datesheet in Module 1 to activate real countdowns, chronological views, and gap alerts.'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Button
               type="button"
-              onClick={() => navigate('/achievements')}
-              className="px-4 py-3 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/40 text-center flex-1 sm:flex-initial shadow-sm transition-colors cursor-pointer"
+              variant="primary"
+              size="md"
+              onClick={() => navigate('/datesheet-analyzer')}
+              icon={<CalendarDays className="w-4 h-4" />}
             >
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Verified XP
-              </span>
-              <span
-                data-testid="dashboard-verified-xp"
-                className="text-xl font-extrabold text-emerald-400 tabular-nums"
-              >
-                {verifiedXp.toLocaleString()} XP
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/achievements')}
-              className="px-4 py-3 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 text-center flex-1 sm:flex-initial shadow-sm transition-colors cursor-pointer"
-            >
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Verified Streak
-              </span>
-              <span
-                data-testid="dashboard-verified-streak"
-                className="text-xl font-extrabold text-amber-400 flex items-center justify-center gap-1 tabular-nums"
-              >
-                <Flame className="w-5 h-5 fill-amber-400 text-amber-500" />
-                {streakDays}d
-              </span>
-            </button>
-            <div className="px-4 py-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-center flex-1 sm:flex-initial shadow-sm">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Language
-              </span>
-              <span className="text-sm font-bold text-indigo-300 flex items-center justify-center gap-1 mt-0.5">
-                {user?.language || 'English'}
-              </span>
-            </div>
+              {summary.confirmedDatesheet ? 'Open Datesheet' : 'Upload Datesheet'}
+            </Button>
           </div>
         </div>
+      </Card>
 
-        {!loadingDashboard && !hasAnyRealActivity && (
-          <div className="mt-6 pt-5 border-t border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
-                Fresh Workspace Ready
-              </p>
-              <p className="text-xs text-slate-300">
-                Your progress, XP, and streaks start cleanly at 0 and update as you learn. Pick any
-                module below to begin.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => navigate('/ai-teacher')}
-                icon={<Bot className="w-3.5 h-3.5" />}
-              >
-                Start First Lesson
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => navigate('/practice')}
-                icon={<Target className="w-3.5 h-3.5" />}
-              >
-                Try Practice Set
-              </Button>
-            </div>
+      {/* 2. ACTIVE EXAM SUMMARY + NEXT EXAM COUNTDOWN */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              Active Exam Overview
+            </h2>
+            {summary.confirmedDatesheet && (
+              <Badge variant="success" size="sm">
+                Confirmed
+              </Badge>
+            )}
           </div>
-        )}
+
+          {loading ? (
+            <div className="py-8 text-center text-xs text-slate-500">
+              Loading your saved datesheets...
+            </div>
+          ) : summary.confirmedDatesheet && summary.analysis ? (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                    Next Exam Countdown
+                  </span>
+                  {summary.nextExam ? (
+                    <>
+                      <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                        {summary.nextExam.subject}
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-mono-num">
+                        {formatDisplayDate(summary.nextExam.date)} ({summary.nextExam.weekday})
+                        {summary.nextExam.rawTimeText
+                          ? ` • ${summary.nextExam.rawTimeText}`
+                          : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Schedule Completed
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        All dates in "{summary.confirmedDatesheet.title}" are in the past.
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {summary.nextExam && (
+                  <div className="px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 text-center shrink-0">
+                    <span className="font-mono-num text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-300 block">
+                      {summary.nextExam.daysRemaining === 0
+                        ? 'TODAY'
+                        : `${summary.nextExam.daysRemaining}d`}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      {summary.nextExam.daysRemaining === 0 ? 'Exam Day' : 'Days Remaining'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    Total Papers
+                  </span>
+                  <span className="font-mono-num text-base font-extrabold text-slate-900 dark:text-white">
+                    {summary.analysis.totalExams}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    Upcoming
+                  </span>
+                  <span className="font-mono-num text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {summary.analysis.upcomingExamsCount}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    Window Span
+                  </span>
+                  <span className="font-mono-num text-base font-extrabold text-slate-900 dark:text-white">
+                    {summary.analysis.totalSpanDays !== null
+                      ? `${summary.analysis.totalSpanDays}d`
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center space-y-3">
+              <div className="mx-auto w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center">
+                <Upload className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="space-y-1 max-w-md mx-auto">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  {summary.latestDraftDatesheet
+                    ? 'Draft datesheet saved — confirmation required'
+                    : 'No confirmed exam datesheet yet'}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {summary.latestDraftDatesheet
+                    ? `Open "${summary.latestDraftDatesheet.title}" in the Datesheet Analyzer to review and confirm your exam dates.`
+                    : 'Upload your PDF or JPG/PNG exam schedule in Module 1 to unlock live countdowns and gap highlights.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => navigate('/datesheet-analyzer')}
+                icon={<ArrowRight className="w-3.5 h-3.5" />}
+              >
+                {summary.latestDraftDatesheet ? 'Review & Confirm Draft' : 'Analyze Your Datesheet'}
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {/* Alerts & Highlights */}
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              Alerts &amp; Highlights
+            </h2>
+          </div>
+
+          {summary.alerts.length > 0 ? (
+            <div className="space-y-2.5">
+              {summary.alerts.map((alert) => {
+                const style =
+                  alert.level === 'urgent'
+                    ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25 text-rose-800 dark:text-rose-200'
+                    : alert.level === 'warning'
+                      ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/25 text-amber-800 dark:text-amber-200'
+                      : 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/25 text-blue-800 dark:text-blue-200';
+                return (
+                  <div key={alert.id} className={`p-3 rounded-xl border text-xs space-y-1 ${style}`}>
+                    <p className="font-bold">{alert.title}</p>
+                    <p className="opacity-90 leading-relaxed">{alert.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-6 text-center space-y-2 text-xs text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="w-5 h-5 mx-auto text-emerald-500" />
+              <p>
+                {summary.confirmedDatesheet
+                  ? 'No urgent schedule conflicts or tight-gap warnings right now.'
+                  : 'Schedule alerts will appear here automatically after you upload or confirm a datesheet.'}
+              </p>
+            </div>
+          )}
+        </Card>
       </div>
 
-      {/* 2. DAILY LEARNING GOALS & CONTINUE LEARNING (GRID 2 COLS) */}
+      {/* 3. UPCOMING EXAMS + TODAY'S STUDY TASKS (COMING SOON) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* SECTION 2: Daily Learning Goals (Verified Auto-Completion) */}
-        <div className="lg:col-span-1 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <Target className="w-4 h-4 text-indigo-400" />
-              Daily Learning Goals
+        <Card className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+              Upcoming Exams Chronological List
             </h2>
-            <span className="text-xs font-semibold text-emerald-400 tabular-nums">
-              +{earnedGoalXpToday} / {potentialGoalXp} XP
+            {summary.confirmedDatesheet && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/datesheet-analyzer')}
+              >
+                Full Schedule →
+              </Button>
+            )}
+          </div>
+
+          {summary.upcomingSchedule.length > 0 ? (
+            <div className="space-y-2.5">
+              {summary.upcomingSchedule.slice(0, 5).map((item) => (
+                <div
+                  key={item.entry.id}
+                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                >
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {item.entry.subject}
+                      </span>
+                      {item.isNextUpcoming && (
+                        <Badge size="sm" variant="purple">
+                          Next
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono-num">
+                      {formatDisplayDate(item.entry.date)} • {item.entry.weekday || '—'}
+                      {item.entry.rawTimeText ? ` • ${item.entry.rawTimeText}` : ''}
+                      {item.prepDaysFromPrevious !== null
+                        ? ` • ${item.prepDaysFromPrevious}d gap from prev`
+                        : ''}
+                    </p>
+                  </div>
+                  <span className="font-mono-num text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
+                    {item.daysRemaining === 0 ? 'Today' : `In ${item.daysRemaining}d`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+              {summary.confirmedDatesheet
+                ? 'No upcoming papers remaining on your active datesheet.'
+                : 'Your upcoming exams will appear here chronologically once you confirm a datesheet.'}
+            </div>
+          )}
+        </Card>
+
+        {/* Honest Coming Soon: Today's Study Tasks */}
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-slate-400" />
+              Today&apos;s Study Tasks
+            </h2>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Coming Soon
             </span>
           </div>
 
-          <Card className="space-y-4 border-indigo-500/20 bg-gradient-to-b from-slate-900 to-indigo-950/20">
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-slate-400">Today’s Target Progress</span>
-                <span
-                  data-testid="daily-goals-progress"
-                  className="font-bold text-white tabular-nums"
-                >
-                  {completedGoalsCount} of {totalGoalsCount} Completed ({dailyCompletionPct}%)
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 via-blue-500 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${dailyCompletionPct}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {loadingDashboard && dailyGoals.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">
-                  Loading today’s personalized study targets...
-                </p>
-              ) : (
-                dailyGoals.map((goal) => (
-                  <button
-                    key={goal.id}
-                    type="button"
-                    onClick={() => navigate(goal.actionRoute)}
-                    className={`w-full text-left p-3 rounded-xl border text-xs flex items-start gap-3 transition-all cursor-pointer ${
-                      goal.completed
-                        ? 'bg-emerald-950/20 border-emerald-500/30 text-slate-300'
-                        : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-indigo-500/40'
-                    }`}
-                  >
-                    <span
-                      className={`w-5 h-5 rounded-lg flex items-center justify-center border mt-0.5 flex-shrink-0 ${
-                        goal.completed
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                          : 'border-slate-700 bg-slate-900 text-slate-500'
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {goal.completed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Play className="w-2.5 h-2.5" />}
-                    </span>
-                    <div className="flex-1 space-y-1 min-w-0">
-                      <p
-                        className={`font-semibold ${
-                          goal.completed ? 'line-through text-slate-400' : 'text-white'
-                        }`}
-                      >
-                        {goal.title}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 tabular-nums">
-                        <span>{goal.subject}</span>
-                        <span>•</span>
-                        <span>
-                          {goal.currentCount}/{goal.targetCount} done
-                        </span>
-                        <span>•</span>
-                        <span className="text-emerald-400 font-bold">+{goal.xpReward} XP</span>
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-
+          <div className="py-4 space-y-3 text-xs text-slate-600 dark:text-slate-400">
+            <p className="font-semibold text-slate-800 dark:text-slate-200">
+              Connected to Module 2: Personal Study Planner
+            </p>
+            <p className="leading-relaxed">
+              Once Personal Study Planner launches, your daily study tasks will be generated
+              directly from your confirmed exam datesheet and prep gaps. No placeholder tasks are
+              shown beforehand.
+            </p>
             <Button
-              size="sm"
+              type="button"
               variant="outline"
-              className="w-full text-xs"
-              onClick={() => navigate('/practice')}
-              icon={<Play className="w-3.5 h-3.5" />}
+              size="sm"
+              onClick={() => navigate('/study-planner')}
             >
-              Practice Board Questions
+              View Module 2 Details
             </Button>
-          </Card>
-        </div>
-
-        {/* SECTION 3: Chapter Progress & Continue Learning (Real Verified Percentage Only) */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-indigo-400" />
-              Chapter Progress ({board} {grade})
-            </h2>
-            {availableSubjects.length > 2 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {availableSubjects.slice(0, 5).map((subjName) => (
-                  <button
-                    key={subjName}
-                    type="button"
-                    onClick={() => setSelectedChapterSubject(subjName)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                      selectedChapterSubject === subjName
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                    }`}
-                  >
-                    {subjName}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {visibleChapters.length > 0 ? (
-              visibleChapters.slice(0, 2).map((chapter) => {
-                const statusLabel =
-                  chapter.status === 'completed'
-                    ? 'Completed'
-                    : chapter.status === 'in_progress'
-                      ? 'In Progress'
-                      : 'Not Started';
-                return (
-                  <Card
-                    key={chapter.chapterId}
-                    hover
-                    className="flex flex-col justify-between space-y-4 border-indigo-500/25"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant="purple" size="sm">
-                          {chapter.subject}
-                        </Badge>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1 tabular-nums">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          {chapter.estimatedMinutesRemaining}m est.
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-white line-clamp-2">
-                        {chapter.chapterTitle}
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {chapter.completedTopics} of {chapter.totalTopics} concept
-                        {chapter.totalTopics === 1 ? '' : 's'} completed •{' '}
-                        <span
-                          className={
-                            chapter.status === 'completed'
-                              ? 'text-emerald-400 font-semibold'
-                              : chapter.status === 'in_progress'
-                                ? 'text-indigo-300 font-semibold'
-                                : 'text-slate-400'
-                          }
-                        >
-                          {statusLabel}
-                        </span>
-                      </p>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <div className="flex justify-between text-[11px] text-slate-400 tabular-nums">
-                        <span>Chapter Progress</span>
-                        <span className="font-bold text-indigo-400">
-                          {chapter.percentComplete}%
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            chapter.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-500'
-                          }`}
-                          style={{ width: `${chapter.percentComplete}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => openChapterLesson(chapter, 'ai-teacher')}
-                          icon={<Play className="w-3.5 h-3.5" />}
-                        >
-                          {chapter.status === 'in_progress'
-                            ? 'Resume Lesson'
-                            : chapter.status === 'completed'
-                              ? 'Review Lesson'
-                              : 'Start Lesson'}
-                        </Button>
-                        {FEATURE_FLAGS.visualLearningEnabled && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => openChapterLesson(chapter, 'visual-lab')}
-                            icon={<Atom className="w-3.5 h-3.5" />}
-                          >
-                            Visual Lab
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })
-            ) : (
-              <Card className="sm:col-span-2 py-8 text-center space-y-3">
-                <p className="text-sm font-semibold text-white">
-                  No chapters loaded for this filter
-                </p>
-                <p className="text-xs text-slate-400">
-                  {FEATURE_FLAGS.visualLearningEnabled
-                    ? 'Launch AI Socratic Teacher or Visual Learning Lab to begin your first topic.'
-                    : 'Launch AI Socratic Teacher to begin your first topic.'}
-                </p>
-                <div className="flex justify-center gap-2">
-                  <Button size="sm" variant="primary" onClick={() => navigate('/ai-teacher')}>
-                    Open AI Teacher
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
+        </Card>
       </div>
 
-      {/* 4. RECENT DOUBTS & 5. UPCOMING REVISION (GRID 2 COLS) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SECTION 4: Recent Doubts */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-cyan-400" />
-              Recent Doubts Solved
-            </h2>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate('/doubt-solver')}
-              icon={<ArrowRight className="w-3.5 h-3.5" />}
-            >
-              Ask Doubt
-            </Button>
-          </div>
-
-          <Card className="space-y-3">
-            {recentDoubts.length > 0 ? (
-              recentDoubts.map((doubt) => (
-                <button
-                  key={doubt.id}
-                  type="button"
-                  onClick={() => navigate('/doubt-solver')}
-                  className="w-full text-left p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="success" size="sm">
-                        Solved
-                      </Badge>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {doubt.subject}
-                        {doubt.topic ? ` • ${doubt.topic}` : ''}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-white group-hover:text-cyan-300 transition-colors truncate">
-                      {doubt.title}
-                    </p>
-                    <span className="text-[10px] text-slate-500">
-                      {doubt.structuredSolution?.stepByStepSolution?.length || 1} step AI breakdown
-                      {doubt.attachmentLabel ? ` • ${doubt.attachmentLabel}` : ''}
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all flex-shrink-0 ml-2" />
-                </button>
-              ))
-            ) : (
-              <div className="py-6 text-center space-y-3">
-                <p className="text-xs text-slate-300 font-semibold">No doubts submitted yet</p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Stuck on a proof, numerical, or NCERT concept? Submit your question or photo for a
-                  step-by-step walkthrough.
-                </p>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => navigate('/doubt-solver')}
-                  icon={<HelpCircle className="w-3.5 h-3.5" />}
-                >
-                  Ask First Doubt
-                </Button>
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* SECTION 5: Upcoming Revision (Spaced Repetition Active Recall) */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-amber-400" />
-              Upcoming Revision (Active Recall)
-            </h2>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate('/memory-booster')}
-              icon={<RotateCcw className="w-3.5 h-3.5" />}
-            >
-              Review Now
-            </Button>
-          </div>
-
-          <Card className="space-y-3">
-            {dueFlashcards.length > 0 ? (
-              dueFlashcards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/memory-booster?subject=${encodeURIComponent(card.subject)}&topic=${encodeURIComponent(card.topic)}`
-                    )
-                  }
-                  className="w-full text-left p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        Due Today
-                      </span>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {card.subject} · {card.topic}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors truncate">
-                      {card.front}
-                    </p>
-                    <span className="text-[10px] text-slate-500 tabular-nums">
-                      SM-2 EF {card.easeFactor.toFixed(2)} · {card.repetitions} review
-                      {card.repetitions === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-300 group-hover:text-amber-300 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 shrink-0 ml-2">
-                    Recall
-                  </span>
-                </button>
-              ))
-            ) : (
-              <div className="py-6 text-center space-y-3">
-                <p className="text-xs text-slate-300 font-semibold">No flashcards due for revision</p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Generate active-recall flashcards from any chapter or mistake to activate SM-2
-                  spaced repetition scheduling.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate('/memory-booster')}
-                  icon={<RotateCcw className="w-3.5 h-3.5" />}
-                >
-                  Open Memory Booster
-                </Button>
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
-
-      {/* 6. RECOMMENDED PRACTICE & 7. LEARNING PROGRESS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* SECTION 6: Dynamic Adaptive Practice Recommendations */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                <Target className="w-4 h-4 text-emerald-400" />
-                Recommended Adaptive Practice
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Ranked dynamically for {board} {grade} from your mastery, due cards & study history
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRefreshRecommendations}
-              disabled={refreshingRecs}
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${refreshingRecs ? 'animate-spin' : ''}`} />}
-            >
-              {refreshingRecs ? 'Refreshing...' : 'Refresh Suggestions'}
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {recommendations.length > 0 ? (
-              recommendations.slice(0, 4).map((rec) => (
-                <Card key={rec.id} hover className="p-4 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge variant="purple" size="sm">
-                        {rec.subject}
-                      </Badge>
-                      <Badge variant={getDifficultyBadgeVariant(rec.difficulty)} size="sm">
-                        {getDifficultyLabel(rec.difficulty)}
-                      </Badge>
-                    </div>
-                    <h4 className="text-xs font-bold text-white">{rec.title}</h4>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      {rec.chapter} • {rec.topic}
-                    </p>
-                    <p className="text-[11px] text-indigo-300 bg-indigo-950/40 border border-indigo-500/20 rounded-lg px-2.5 py-1.5">
-                      Why now: {rec.reason}
-                    </p>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-800">
-                    <span className="text-[11px] text-emerald-400 font-semibold tabular-nums">
-                      +{rec.xpReward} XP • ~{rec.estimatedMinutes}m
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={actingRecId === rec.id}
-                        onClick={() => handleSkipRecommendation(rec)}
-                        icon={<SkipForward className="w-3 h-3" />}
-                        aria-label={`Skip ${rec.title}`}
-                      >
-                        Skip
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        disabled={actingRecId === rec.id}
-                        onClick={() => handleStartRecommendation(rec)}
-                        icon={<Play className="w-3 h-3" />}
-                      >
-                        Start
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <Card className="sm:col-span-2 py-6 text-center space-y-3">
-                <p className="text-xs text-slate-300 font-semibold">
-                  {loadingDashboard
-                    ? 'Analyzing curriculum and mastery signals...'
-                    : 'All current suggestions were completed or skipped'}
-                </p>
-                <div className="flex justify-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleRefreshRecommendations}
-                    disabled={refreshingRecs}
-                    icon={<RefreshCw className="w-3.5 h-3.5" />}
-                  >
-                    Load Fresh Suggestions
-                  </Button>
-                  <Button size="sm" variant="primary" onClick={() => navigate('/practice')}>
-                    Open Practice Bank
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* SECTION 7: Learning Progress (Subject Mastery Cards) */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-indigo-400" />
-              Curriculum Mastery
-            </h2>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => navigate('/learning-intelligence')}
-            >
-              Deep Insights →
-            </Button>
-          </div>
-
-          <Card className="space-y-3.5">
-            {topicMasteryList.length > 0 ? (
-              topicMasteryList.map((tm) => (
-                <div key={tm.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs gap-2">
-                    <span className="font-semibold text-slate-200 truncate">
-                      {tm.subject}: {tm.topic}
-                    </span>
-                    <span className="font-bold text-white tabular-nums shrink-0">
-                      {Math.round(tm.weightedMasteryScore)}%
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        tm.status === 'mastered'
-                          ? 'bg-emerald-500'
-                          : tm.status === 'needs-revision'
-                            ? 'bg-amber-500'
-                            : 'bg-indigo-500'
-                      }`}
-                      style={{ width: `${Math.round(tm.weightedMasteryScore)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-500 tabular-nums">
-                    <span>
-                      {tm.attemptsCount} attempt{tm.attemptsCount === 1 ? '' : 's'}
-                    </span>
-                    <span>
-                      {tm.revisionCount} recall review{tm.revisionCount === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-4 text-center space-y-3">
-                <p className="text-xs text-slate-400">
-                  No topic mastery attempts recorded yet. Practice a set to track real concept
-                  mastery over time.
-                </p>
-                <Button size="sm" variant="outline" onClick={() => navigate('/practice')}>
-                  Start Adaptive Practice
-                </Button>
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
-
-      {/* 8. QUICK ACCESS TO CORE MODULES */}
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+      {/* 4. QUICK MODULE ACCESS (5 CORE MODULES) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              {FEATURE_FLAGS.visualLearningEnabled
-                ? 'Eduverse AI Learning Suite • All 11 Modules'
-                : 'Eduverse AI Learning Suite • 10 Active Modules'}
+            <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+              EDUVERSE AI Exam Modules
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Comprehensive Indian school ecosystem built specifically for Class 6 to 12 scholars.
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Focused 5-module exam preparation system for Class 6–12 students.
             </p>
           </div>
-          <Badge variant="purple" size="md">
-            {FEATURE_FLAGS.visualLearningEnabled ? '11 Intelligent Engines' : '10 Active Engines'}
-          </Badge>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {CORE_MODULES.map((mod) => {
-            const Icon = mod.icon;
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {CORE_EXAM_MODULES.map((mod) => {
+            const Icon = MODULE_ICONS[mod.iconName] || CalendarDays;
+            const isActive = mod.status === 'active';
             return (
               <button
-                key={mod.id}
+                key={mod.path}
                 type="button"
-                onClick={() => navigate(mod.route)}
-                className="text-left rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 flex flex-col justify-between group cursor-pointer p-4 transition-all shadow-sm"
+                onClick={() => navigate(mod.path)}
+                className={`text-left rounded-2xl p-4 border transition-all flex flex-col justify-between gap-3 cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500 shadow-xs'
+                    : 'bg-slate-50/80 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
               >
-                <div className="w-full">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 text-indigo-400 flex items-center justify-center group-hover:scale-105 group-hover:bg-indigo-600/20 group-hover:border-indigo-500/40 transition-all">
-                      <Icon className="w-4 h-4 text-indigo-300" />
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div
+                      className={`p-2 rounded-xl ${
+                        isActive
+                          ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400'
+                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
                     </div>
-                    <Badge variant="default" size="sm">
-                      {mod.badge}
-                    </Badge>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        isActive
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    >
+                      {isActive ? 'Active' : 'Coming Soon'}
+                    </span>
                   </div>
-                  <h3 className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
-                    {mod.title}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                    {mod.desc}
-                  </p>
+
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Module 0{mod.moduleNumber}
+                    </p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
+                      {mod.shortTitle || mod.title}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-3 leading-relaxed">
+                      {mod.description}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="w-full mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-semibold text-indigo-400">
-                  <span>Launch Engine</span>
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-                </div>
+                <span
+                  className={`text-xs font-semibold inline-flex items-center gap-1 ${
+                    isActive
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {isActive ? 'Open Analyzer' : 'Module Preview'}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
               </button>
             );
           })}
-          {!FEATURE_FLAGS.visualLearningEnabled && (
-            <VisualLearningComingSoonCard variant="grid" />
-          )}
         </div>
       </div>
+
+      {/* 5. RECENT ACTIVITY */}
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+            <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            Recent Datesheet Activity
+          </h2>
+        </div>
+
+        {activities.length > 0 ? (
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {activities.slice(0, 6).map((act) => (
+              <div
+                key={act.id}
+                className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 dark:text-white">{act.title}</span>
+                  {act.detail && (
+                    <span className="text-slate-500 dark:text-slate-400"> — {act.detail}</span>
+                  )}
+                </div>
+                <span className="font-mono-num text-[11px] text-slate-400 shrink-0">
+                  {formatDisplayDate(act.timestamp.slice(0, 10))}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-4 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+            <Info className="w-4 h-4 text-slate-400 shrink-0" />
+            <span>
+              No datesheet activity recorded yet. Upload and confirm your first exam schedule to
+              start tracking updates.
+            </span>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };

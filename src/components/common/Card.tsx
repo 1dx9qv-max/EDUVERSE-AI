@@ -18,11 +18,11 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`relative rounded-2xl bg-slate-900/80 backdrop-blur-md border border-slate-800/80 p-5 transition-all duration-200 ${
-        glow ? 'shadow-lg shadow-indigo-500/10 border-indigo-500/30' : ''
+      className={`relative rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-5 transition-all duration-150 shadow-xs dark:shadow-none ${
+        glow ? 'border-indigo-500/40 dark:border-indigo-500/35 ring-1 ring-indigo-500/10' : ''
       } ${
         hover
-          ? 'hover:border-indigo-500/40 hover:bg-slate-900/95 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-0.5 cursor-pointer'
+          ? 'hover:border-indigo-500/50 dark:hover:border-indigo-500/40 hover:shadow-md dark:hover:bg-slate-900 cursor-pointer'
           : ''
       } ${className}`}
     >

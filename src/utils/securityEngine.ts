@@ -1,14 +1,12 @@
-import type { GuardianLinkRecord, GuardianStudentSummary } from '../types/phase8.ts';
-
 export interface MagicByteValidationResult {
   valid: boolean;
-  detectedType?: 'image/png' | 'image/jpeg' | 'image/webp' | 'application/pdf';
+  detectedType?: 'image/png' | 'image/jpeg' | 'application/pdf';
   error?: string;
 }
 
 /**
  * Validates raw file magic bytes from base64 payload to prevent MIME-type spoofing
- * (e.g., an executable or HTML/script renamed to .png/.pdf).
+ * (e.g., an executable or HTML/script renamed to .png/.jpg/.pdf).
  */
 export function validateFileMagicBytes(
   declaredMimeType: string,
@@ -43,16 +41,6 @@ export function validateFileMagicBytes(
   const isPng =
     bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
   const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  const isWebp =
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 && // R
-    bytes[1] === 0x49 && // I
-    bytes[2] === 0x46 && // F
-    bytes[3] === 0x46 && // F
-    bytes[8] === 0x57 && // W
-    bytes[9] === 0x45 && // E
-    bytes[10] === 0x42 && // B
-    bytes[11] === 0x50; // P
   const isPdf =
     bytes[0] === 0x25 && // %
     bytes[1] === 0x50 && // P
@@ -70,18 +58,13 @@ export function validateFileMagicBytes(
       ? { valid: true, detectedType: 'image/jpeg' }
       : { valid: false, error: 'File signature mismatch: file claims to be JPEG but lacks JPEG SOI signature.' };
   }
-  if (mime === 'image/webp') {
-    return isWebp
-      ? { valid: true, detectedType: 'image/webp' }
-      : { valid: false, error: 'File signature mismatch: file claims to be WEBP but lacks RIFF/WEBP signature.' };
-  }
   if (mime === 'application/pdf') {
     return isPdf
       ? { valid: true, detectedType: 'application/pdf' }
       : { valid: false, error: 'File signature mismatch: file claims to be PDF but lacks %PDF- header.' };
   }
 
-  return { valid: false, error: `Unsupported MIME type (${declaredMimeType}).` };
+  return { valid: false, error: `Unsupported MIME type (${declaredMimeType}). Only PDF, JPG, JPEG, and PNG files are allowed.` };
 }
 
 const DANGEROUS_EXTENSIONS = [
@@ -119,7 +102,6 @@ export function sanitizeUploadedFilename(rawFileName: string): {
       error: 'Unsafe file name rejected (path traversal characters are not allowed).',
     };
   }
-  // Reject ASCII control chars or null bytes
   if (/[\x00-\x1f\x7f]/.test(trimmed)) {
     return { valid: false, error: 'File name contains invalid control characters.' };
   }
@@ -139,6 +121,17 @@ export function sanitizeUploadedFilename(rawFileName: string): {
   return { valid: true, sanitizedName };
 }
 
+export function sanitizeDocumentId(rawId: string | undefined, prefix: string): string {
+  const clean = (rawId || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 100);
+  if (clean && /^[a-zA-Z0-9_-]+$/.test(clean)) {
+    return clean;
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * Strips stack traces, filesystem paths, API keys, and tokens from user-facing errors.
  */
@@ -150,14 +143,11 @@ export function sanitizeClientErrorMessage(error: unknown): string {
         ? error
         : 'An unexpected service error occurred.';
 
-  let cleaned = raw
-    // Redact Google / Gemini keys, Bearer tokens, JWTs
+  const cleaned = raw
     .replace(/AIza[0-9A-Za-z\-_]{20,}/g, '[redacted-key]')
     .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer [redacted]')
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[redacted-jwt]')
-    // Redact stack trace lines
     .split('\n')[0]
-    // Redact local file paths
     .replace(/\/(?:app|Users|home|var|tmp|srv)\/[^\s):]+/g, '[server-path]')
     .replace(/[A-Za-z]:\\[^\s):]+/g, '[server-path]')
     .trim();
@@ -175,7 +165,7 @@ export function sanitizeClientErrorMessage(error: unknown): string {
 
 export interface AgeSafetyScreenResult {
   safe: boolean;
-  category?: 'self-harm' | 'explicit-adult' | 'violence-weapons' | 'harassment' | 'pii-leak' | 'prompt-injection';
+  category?: 'self-harm' | 'explicit-adult' | 'violence-weapons' | 'harassment' | 'prompt-injection';
   reason?: string;
 }
 
@@ -187,12 +177,12 @@ const AGE_SAFETY_PATTERNS: Array<{
   {
     category: 'self-harm',
     regex: /\b((how|ways|methods) to (commit )?suicide|ways to (kill|harm) myself|self[- ]?harm instructions|end my life)\b/i,
-    reason: 'This request touches on self-harm. Eduverse is an academic classroom — please speak with a trusted parent, teacher, or school counsellor right away if you need support.',
+    reason: 'This request touches on self-harm. Please speak with a trusted parent, teacher, or school counsellor right away if you need support.',
   },
   {
     category: 'explicit-adult',
     regex: /\b(pornography|explicit sexual|erotic story|nsfw nude|sexual intercourse tutorial)\b/i,
-    reason: 'Explicit adult content is blocked on Eduverse K-12 student accounts.',
+    reason: 'Explicit adult content is blocked on Eduverse student accounts.',
   },
   {
     category: 'violence-weapons',
@@ -225,94 +215,6 @@ export function screenAgeAppropriateContent(text: string): AgeSafetyScreenResult
     }
   }
   return { safe: true };
-}
-
-export function canPerformAdminMutation(authCtx: {
-  authenticated: boolean;
-  verifiedRole: string;
-  accountStatus?: string;
-}): boolean {
-  return Boolean(
-    authCtx.authenticated &&
-      authCtx.verifiedRole === 'admin' &&
-      authCtx.accountStatus !== 'suspended'
-  );
-}
-
-export function canGuardianReadSection(
-  link: Pick<GuardianLinkRecord, 'status' | 'permissions'> | null | undefined,
-  section: keyof GuardianLinkRecord['permissions']
-): boolean {
-  if (!link || link.status !== 'verified') return false;
-  return Boolean(link.permissions && link.permissions[section] === true);
-}
-
-export interface RawGuardianStudentTelemetry {
-  studentDisplayName: string;
-  board: GuardianLinkRecord['studentBoard'];
-  classGrade: GuardianLinkRecord['studentClassGrade'];
-  language: string;
-  progressSummary: NonNullable<GuardianStudentSummary['progressSummary']>;
-  goalsOverview: NonNullable<GuardianStudentSummary['goalsOverview']>;
-  assessmentsSummary: NonNullable<GuardianStudentSummary['assessmentsSummary']>;
-}
-
-/**
- * Strictly enforces Guardian privacy boundaries in code:
- * If a student has not verified the link or disabled any permission flag,
- * that entire summary section is omitted (redacted) before returning to the guardian.
- */
-export function projectGuardianStudentSummary(
-  raw: RawGuardianStudentTelemetry,
-  link: GuardianLinkRecord
-): GuardianStudentSummary {
-  const restrictedSections: string[] = [];
-
-  if (link.status !== 'verified') {
-    return {
-      link,
-      studentDisplayName: raw.studentDisplayName,
-      board: raw.board,
-      classGrade: raw.classGrade,
-      language: raw.language,
-      restrictedSections: ['progress', 'goals', 'assessments'],
-      safetyNotice:
-        link.status === 'pending'
-          ? 'Waiting for explicit student approval before any learning data is shared.'
-          : 'Guardian link has been revoked. No student records are accessible.',
-    };
-  }
-
-  const result: GuardianStudentSummary = {
-    link,
-    studentDisplayName: raw.studentDisplayName,
-    board: raw.board,
-    classGrade: raw.classGrade,
-    language: raw.language,
-    restrictedSections,
-    safetyNotice:
-      'Private study-room chats, personal AI doubt transcripts, and raw voice audio are never exposed to guardians.',
-  };
-
-  if (canGuardianReadSection(link, 'canViewProgress')) {
-    result.progressSummary = raw.progressSummary;
-  } else {
-    restrictedSections.push('progress');
-  }
-
-  if (canGuardianReadSection(link, 'canViewGoals')) {
-    result.goalsOverview = raw.goalsOverview;
-  } else {
-    restrictedSections.push('goals');
-  }
-
-  if (canGuardianReadSection(link, 'canViewAssessments')) {
-    result.assessmentsSummary = raw.assessmentsSummary;
-  } else {
-    restrictedSections.push('assessments');
-  }
-
-  return result;
 }
 
 export interface RateLimitCheckResult {

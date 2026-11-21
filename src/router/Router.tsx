@@ -10,41 +10,32 @@ interface RouterContextType {
 
 const RouterContext = createContext<RouterContextType | undefined>(undefined);
 
+const VALID_ROUTES: AppRoute[] = [
+  '/',
+  '/login',
+  '/signup',
+  '/dashboard',
+  '/datesheet-analyzer',
+  '/study-planner',
+  '/sample-papers',
+  '/exam-mode',
+  '/personal-advisor',
+  '/settings',
+];
+
 export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const normalizePath = (path: string): AppRoute => {
-    // If empty or root
     if (!path || path === '') return '/';
-    // Strip trailing slash if present (except root)
     const cleaned = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
-    const validRoutes: AppRoute[] = [
-      '/',
-      '/login',
-      '/signup',
-      '/dashboard',
-      '/ai-teacher',
-      '/doubt-solver',
-      '/visual-lab',
-      '/practice',
-      '/learning-intelligence',
-      '/memory-booster',
-      '/mindmaps',
-      '/exam-simulator',
-      '/voice-learning',
-      '/collaborative-learning',
-      '/achievements',
-      '/guardian',
-      '/settings',
-      '/admin',
-    ];
-    if (validRoutes.includes(cleaned as AppRoute)) {
+    if (VALID_ROUTES.includes(cleaned as AppRoute)) {
       return cleaned as AppRoute;
     }
     return '/';
   };
 
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => {
-    return normalizePath(window.location.pathname);
-  });
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() =>
+    normalizePath(window.location.pathname)
+  );
   const [searchString, setSearchString] = useState<string>(() => window.location.search || '');
 
   useEffect(() => {
